@@ -1,0 +1,11 @@
+{
+  "id": 12345,
+  "name": "Test Song",
+  "trackName": "Test Song",
+  "artistName": "Test Artist",
+  "albumName": "Test Album",
+  "duration": 200.0,
+  "instrumental": false,
+  "plainLyrics": "exact plain line one\nexact plain line two",
+  "syncedLyrics": "[00:00.00]exact first line\n[00:05.00]exact second line"
+}

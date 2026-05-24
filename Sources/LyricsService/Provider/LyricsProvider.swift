@@ -19,7 +19,7 @@ protocol _LyricsProvider: LyricsProvider {
 }
 
 @Loggable
-private enum LyricsProviderLog {
+enum LyricsProviderLog {
     static func fetchTaskFailed(_ error: any Error) {
         #log(.error, "A fetch task failed, skipping. Error: \(error)")
     }
