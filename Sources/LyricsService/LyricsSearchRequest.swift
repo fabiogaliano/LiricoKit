@@ -64,6 +64,20 @@ public struct LyricsSearchRequest: Equatable, Sendable, Identifiable {
     }
 }
 
+extension LyricsSearchRequest {
+    /// Typed keys for `userInfo` entries defined by LyricsKit itself.
+    public enum UserInfoKey {
+        /// Key for the album name passed in as supplementary search metadata.
+        public static let albumName = "albumName"
+    }
+
+    /// Album name carried as supplementary metadata for providers that can
+    /// use it to narrow their search (e.g. LRCLIB exact-lookup).
+    public var albumName: String? {
+        userInfo[UserInfoKey.albumName]
+    }
+}
+
 extension LyricsSearchRequest.SearchTerm: CustomStringConvertible {
     public var description: String {
         switch self {
