@@ -205,6 +205,50 @@ struct LRCLIBProviderTests {
             _ = try await collect(provider.lyrics(for: completeInfoRequest))
         }
     }
+
+    // MARK: – Case 7 gap: non-colliding broad entries survive deduplication
+
+    /// When the exact /api/get and /api/search return different ids, the broad-path
+    /// entry with a different id must survive — deduplication must only drop the
+    /// duplicate, not wipe all broad results.
+    @Test func deduplicationPreservesNonCollidingBroadEntries() async throws {
+        // search_two_synced.json has id=12345 and id=99999 (both with syncedLyrics,
+        // so neither needs a per-id /api/get fetch).
+        // exact_get.json has id=12345 — so 12345 deduplicates, but 99999 must survive.
+        let mock = MockHTTPClient()
+        mock.stub(path: "/api/search", response: .data(try FixtureLoader.data(named: "LRCLIB/search_two_synced.json")))
+        mock.stub(path: "/api/get", response: .data(try FixtureLoader.data(named: "LRCLIB/exact_get.json")))
+        let provider = LyricsProviders.LRCLIB(httpClient: mock)
+
+        let lyrics = try await collect(provider.lyrics(for: completeInfoRequest))
+        let tokens = Set(lyrics.compactMap { $0.metadata.serviceToken })
+
+        // The colliding entry must appear exactly once (exact wins).
+        let byToken = Dictionary(grouping: lyrics, by: { $0.metadata.serviceToken })
+        #expect(byToken["12345"]?.count == 1, "id 12345 must appear exactly once after dedupe")
+        // The non-colliding broad entry must survive.
+        #expect(tokens.contains("99999"), "non-colliding broad-path entry (id 99999) must be preserved")
+    }
+
+    /// The exact /api/get result that wins a dedup collision must carry the correct
+    /// service token so downstream callers can trace it back to LRCLIB (source-trace tie).
+    @Test func exactWinnerCarriesCorrectServiceToken() async throws {
+        // exact_get.json id=12345 wins over the duplicate in search_two_synced.json.
+        let mock = MockHTTPClient()
+        mock.stub(path: "/api/search", response: .data(try FixtureLoader.data(named: "LRCLIB/search_two_synced.json")))
+        mock.stub(path: "/api/get", response: .data(try FixtureLoader.data(named: "LRCLIB/exact_get.json")))
+        let provider = LyricsProviders.LRCLIB(httpClient: mock)
+
+        let lyrics = try await collect(provider.lyrics(for: completeInfoRequest))
+        let byToken = Dictionary(grouping: lyrics, by: { $0.metadata.serviceToken })
+        let winner = try #require(byToken["12345"]?.first)
+
+        // Service token must be the LRCLIB id as a string (source-trace requirement).
+        #expect(winner.metadata.serviceToken == "12345")
+        // Content must originate from the exact result, not the broad-path duplicate.
+        let firstLine = winner.lines.first?.content.description ?? ""
+        #expect(firstLine.contains("exact first line"))
+    }
 }
 
 func collect<T>(_ stream: AsyncThrowingStream<T, Error>) async throws -> [T] {

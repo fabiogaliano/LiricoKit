@@ -1,0 +1,24 @@
+[
+  {
+    "id": 12345,
+    "name": "Test Song",
+    "trackName": "Test Song",
+    "artistName": "Test Artist",
+    "albumName": "Test Album",
+    "duration": 200.0,
+    "instrumental": false,
+    "plainLyrics": "broad plain line one",
+    "syncedLyrics": "[00:00.00]broad first line\n[00:05.00]broad second line"
+  },
+  {
+    "id": 99999,
+    "name": "Another Song",
+    "trackName": "Another Song",
+    "artistName": "Another Artist",
+    "albumName": "Another Album",
+    "duration": 180.0,
+    "instrumental": false,
+    "plainLyrics": "another plain line",
+    "syncedLyrics": "[00:00.00]another first line\n[00:05.00]another second line"
+  }
+]
