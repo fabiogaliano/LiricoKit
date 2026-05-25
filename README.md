@@ -16,6 +16,13 @@ Lyrics submodule for [LyricsX](https://github.com/ddddxxx/LyricsX).
 - <del>Xiami Music</del> (discontinued)
 - <del>ViewLyrics</del> (not working anymore)
 
+## What's New in 1.9.0
+
+- `LyricsProviders.Group.events(for:)` exposes a non-throwing provider lifecycle stream.
+- `LyricsProviders.ProviderDescriptor` lets callers stamp canonical source names into grouped searches.
+- `LyricsSearchRequest.albumName` exposes typed album metadata for providers that can use it.
+- LRCLIB now runs broad `/api/search` and exact `/api/get` lookups concurrently when full track metadata is available.
+
 ## Usage
 
 #### Search lyrics from the internet
@@ -40,6 +47,21 @@ let provider = LyricsProviders.Group(service: [.kugou, .netease, .qq])
 // search
 provider.lyricsPublisher(request: searchReq).sink { lyrics in
     print(lyrics)
+}
+```
+
+#### Provider lifecycle events and canonical source names
+
+```swift
+import LyricsService
+
+let group = LyricsProviders.Group(descriptors: [
+    .init(source: "Kugou", provider: LyricsProviders.Kugou()),
+    .init(source: "NetEase", provider: LyricsProviders.NetEase()),
+])
+
+for await event in group.events(for: searchReq) {
+    print(event)
 }
 ```
 

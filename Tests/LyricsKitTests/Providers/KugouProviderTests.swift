@@ -53,12 +53,15 @@ struct KugouProviderTests {
 
         _ = try await collect(provider.lyrics(for: infoRequest))
 
-        let candidatesRequest = try #require(mock.recorded.first(where: { $0.url?.host == "krcs.kugou.com" }))
-        let query = candidatesRequest.url?.query ?? ""
-        #expect(query.contains("hash=abcdef123456"))
-        #expect(query.contains("album_audio_id=222"))
-        #expect(query.contains("ver=1"))
-        #expect(query.contains("client=mobi"))
+        let candidateQueries = mock.recorded
+            .filter { $0.url?.host == "krcs.kugou.com" }
+            .compactMap { $0.url?.query }
+        #expect(candidateQueries.contains(where: {
+            $0.contains("hash=abcdef123456")
+                && $0.contains("album_audio_id=222")
+                && $0.contains("ver=1")
+                && $0.contains("client=mobi")
+        }))
     }
 
     @Test func networkErrorOnSearchPropagates() async throws {
