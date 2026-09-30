@@ -5,6 +5,12 @@ protocol QQMusicSongSearchResult {
     var mid: String { get }
     var name: String { get }
     var singers: [String] { get }
+    /// Present only in the desktop search response; lets the cover URL be built without a lookup.
+    var albumMid: String? { get }
+}
+
+extension QQMusicSongSearchResult {
+    var albumMid: String? { nil }
 }
 
 struct QQResponseSearchResult: Decodable {
@@ -47,17 +53,24 @@ struct QQResponseSearchResult2: Decodable {
                             let name: String
                         }
 
+                        struct Album: Decodable {
+                            let mid: String?
+                        }
+
                         let mid: String
                         let name: String
                         let _id: Int
                         let singer: [Singer]
+                        let album: Album?
                         var singers: [String] { singer.map(\.name) }
                         var id: String { .init(_id) }
+                        var albumMid: String? { album?.mid.flatMap { $0.isEmpty ? nil : $0 } }
                         enum CodingKeys: String, CodingKey {
                             case mid
                             case name
                             case _id = "id"
                             case singer
+                            case album
                         }
                     }
 

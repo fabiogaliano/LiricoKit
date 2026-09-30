@@ -29,16 +29,13 @@ extension LyricsProviders.QQMusic: _LyricsProvider {
     static let service: String = "QQMusic"
 
     func search(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
-        let combined = await withTaskGroup(of: [LyricsToken].self) { group in
-            group.addTask { await self.searchApi1(for: request) }
-            group.addTask { await self.searchApi2(for: request) }
-
-            var collected: [LyricsToken] = []
-            for await results in group {
-                collected.append(contentsOf: results)
-            }
-            return collected
-        }
+        async let api1 = searchApi1(for: request)
+        async let api2 = searchApi2(for: request)
+        // Desktop search (api2) ranks better, so it leads; `prefix(limit)` downstream then
+        // fetches the same songs every time instead of whichever endpoint answered first,
+        // and the endpoints' overlapping hits are fetched once.
+        var seenMids = Set<String>()
+        let combined = (await api2 + api1).filter { seenMids.insert($0.value.mid).inserted }
         if combined.isEmpty {
             throw LyricsProviderError.processingFailed(reason: "QQMusic search returned no candidates from any endpoint.")
         }
@@ -109,6 +106,10 @@ extension LyricsProviders.QQMusic: _LyricsProvider {
             body: bodyData
         )
 
+        // The cover lookup is independent of the lyrics, so it overlaps the download
+        // instead of adding a round trip after it; desktop-search hits skip it entirely.
+        async let artworkURL: URL? = artworkURL(for: songToken)
+
         let data = try await performer.performData(endpoint)
         guard var dataString = String(data: data, encoding: .utf8) else {
             throw LyricsProviderError.processingFailed(reason: "Could not convert data to string.")
@@ -140,7 +141,7 @@ extension LyricsProviders.QQMusic: _LyricsProvider {
         lrc.applyMetadata(
             title: songToken.name,
             artist: songToken.singers.joined(separator: ","),
-            artworkURL: await fetchAlbumCoverURL(songMid: songToken.mid),
+            artworkURL: await artworkURL,
             serviceToken: "\(songToken.mid)"
         )
         return lrc
@@ -167,7 +168,17 @@ extension LyricsProviders.QQMusic: _LyricsProvider {
               !response.songinfo.data.trackInfo.album.mid.isEmpty else {
             return nil
         }
-        let albumMid = response.songinfo.data.trackInfo.album.mid
-        return URL(string: "https://y.gtimg.cn/music/photo_new/T002R800x800M000\(albumMid).jpg")
+        return Self.albumCoverURL(albumMid: response.songinfo.data.trackInfo.album.mid)
+    }
+
+    private func artworkURL(for song: QQMusicSongSearchResult) async -> URL? {
+        if let albumMid = song.albumMid {
+            return Self.albumCoverURL(albumMid: albumMid)
+        }
+        return await fetchAlbumCoverURL(songMid: song.mid)
+    }
+
+    private static func albumCoverURL(albumMid: String) -> URL? {
+        URL(string: "https://y.gtimg.cn/music/photo_new/T002R800x800M000\(albumMid).jpg")
     }
 }

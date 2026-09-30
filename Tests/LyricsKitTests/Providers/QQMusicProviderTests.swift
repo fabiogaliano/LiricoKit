@@ -87,4 +87,46 @@ struct QQMusicProviderTests {
         let lyrics = try await collect(provider.lyrics(for: infoRequest))
         #expect(lyrics.isEmpty)
     }
+
+    @Test func desktopSearchLeadsAndDuplicatesAreFetchedOnce() async throws {
+        let mock = MockHTTPClient()
+        let api1 = #"{"code":0,"data":{"song":{"itemlist":[{"id":"111","mid":"mid111","name":"Test Song","singer":"Test Artist"},{"id":"222","mid":"mid222","name":"Test Song","singer":"Test Artist"}]}}}"#
+        let api2 = #"{"req_1":{"code":0,"data":{"body":{"song":{"list":[{"mid":"mid222","name":"Test Song","id":222,"singer":[{"name":"Test Artist"}],"album":{"mid":"albumMid222"}}]}}}}}"#
+        mock.stub(path: "/splcloud/fcgi-bin/smartbox_new.fcg", response: .data(Data(api1.utf8)))
+        mock.stub(matching: { request in
+            guard request.url?.path == "/cgi-bin/musicu.fcg" else { return false }
+            let body = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+            return body.contains("get_song_detail_yqq")
+        }, response: .data(try FixtureLoader.data(named: "QQMusic/song_detail.json")))
+        mock.stub(path: "/cgi-bin/musicu.fcg", response: .data(Data(api2.utf8)))
+        mock.stub(path: "/qqmusic/fcgi-bin/lyric_download.fcg",
+                  response: .data(try FixtureLoader.data(named: "QQMusic/lyrics.xml")))
+
+        let provider = LyricsProviders.QQMusic(httpClient: mock)
+        let lyrics = try await collect(provider.lyrics(for: infoRequest))
+
+        #expect(lyrics.map(\.metadata.serviceToken) == ["mid222", "mid111"])
+        let lyricRequests = mock.recorded.filter { $0.url?.path == "/qqmusic/fcgi-bin/lyric_download.fcg" }
+        #expect(lyricRequests.count == 2)
+    }
+
+    @Test func desktopSearchAlbumSkipsCoverLookup() async throws {
+        let mock = MockHTTPClient()
+        let api2 = #"{"req_1":{"code":0,"data":{"body":{"song":{"list":[{"mid":"mid222","name":"Test Song","id":222,"singer":[{"name":"Test Artist"}],"album":{"mid":"albumMid222"}}]}}}}}"#
+        mock.stub(path: "/splcloud/fcgi-bin/smartbox_new.fcg",
+                  response: .data(Data(#"{"code":0,"data":{"song":{"itemlist":[]}}}"#.utf8)))
+        mock.stub(path: "/cgi-bin/musicu.fcg", response: .data(Data(api2.utf8)))
+        mock.stub(path: "/qqmusic/fcgi-bin/lyric_download.fcg",
+                  response: .data(try FixtureLoader.data(named: "QQMusic/lyrics.xml")))
+
+        let provider = LyricsProviders.QQMusic(httpClient: mock)
+        let lyrics = try await collect(provider.lyrics(for: infoRequest))
+
+        let first = try #require(lyrics.first)
+        #expect(first.metadata.artworkURL?.absoluteString.contains("albumMid222") == true)
+        let detailRequests = mock.recorded.filter {
+            String(data: $0.httpBody ?? Data(), encoding: .utf8)?.contains("get_song_detail_yqq") == true
+        }
+        #expect(detailRequests.isEmpty)
+    }
 }
