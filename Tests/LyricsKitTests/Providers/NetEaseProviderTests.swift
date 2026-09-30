@@ -32,6 +32,50 @@ struct NetEaseProviderTests {
         #expect(searchRequests.first?.httpMethod == "POST")
     }
 
+    @Test func laterSearchesReuseTheHarvestedCookie() async throws {
+        let mock = MockHTTPClient()
+        mock.stub(host: "music.163.com",
+                  response: .data(try FixtureLoader.data(named: "NetEase/search.json"), statusCode: 200,
+                                  headers: ["Set-Cookie": "NMTID=abc123; Path=/; Domain=.163.com"]))
+        mock.stub(hostContains: "interface3.music.163.com",
+                  response: .data(try FixtureLoader.data(named: "NetEase/lyrics.json")))
+        let provider = LyricsProviders.NetEase(httpClient: mock)
+
+        _ = try await collect(provider.lyrics(for: infoRequest))
+        _ = try await collect(provider.lyrics(for: infoRequest))
+
+        let searchRequests = mock.recorded.filter { $0.url?.host == "music.163.com" }
+        #expect(searchRequests.count == 3, "second search should skip the cookie-harvest pass")
+        #expect(searchRequests.last?.value(forHTTPHeaderField: "Cookie") == "NMTID=abc123")
+    }
+
+    @Test func rejectedCachedCookieIsReharvested() async throws {
+        let mock = MockHTTPClient()
+        mock.stub(host: "music.163.com",
+                  response: .data(try FixtureLoader.data(named: "NetEase/search.json"), statusCode: 200,
+                                  headers: ["Set-Cookie": "NMTID=abc123; Path=/; Domain=.163.com"]))
+        mock.stub(hostContains: "interface3.music.163.com",
+                  response: .data(try FixtureLoader.data(named: "NetEase/lyrics.json")))
+        let provider = LyricsProviders.NetEase(httpClient: mock)
+        _ = try await collect(provider.lyrics(for: infoRequest))
+
+        mock.reset()
+        let rejected = Data(#"{"code":-462,"data":{}}"#.utf8)
+        mock.stub(matching: { $0.url?.host == "music.163.com" && $0.value(forHTTPHeaderField: "Cookie") == "NMTID=abc123" },
+                  response: .data(rejected))
+        mock.stub(host: "music.163.com",
+                  response: .data(try FixtureLoader.data(named: "NetEase/search.json"), statusCode: 200,
+                                  headers: ["Set-Cookie": "NMTID=fresh; Path=/; Domain=.163.com"]))
+        mock.stub(hostContains: "interface3.music.163.com",
+                  response: .data(try FixtureLoader.data(named: "NetEase/lyrics.json")))
+
+        let lyrics = try await collect(provider.lyrics(for: infoRequest))
+        #expect(!lyrics.isEmpty)
+        let searchRequests = mock.recorded.filter { $0.url?.host == "music.163.com" }
+        #expect(searchRequests.count == 3, "rejected cookie, then harvest + payload passes")
+        #expect(searchRequests.last?.value(forHTTPHeaderField: "Cookie") == "NMTID=fresh")
+    }
+
     @Test func successfullyYieldsLyrics() async throws {
         let mock = MockHTTPClient()
         mock.stub(host: "music.163.com",

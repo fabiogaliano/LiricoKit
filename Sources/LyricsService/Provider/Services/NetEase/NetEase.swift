@@ -8,6 +8,9 @@ extension LyricsProviders {
     final class NetEase {
         let httpClient: HTTPClient
         private let eapiClient: NetEaseEapiClient
+        /// The search API rejects cookieless requests (code -462), and the cookie it hands out
+        /// lives for years, so it is harvested once instead of costing a round trip per search.
+        private let searchCookie = SearchCookie()
         private var performer: NetworkPerformer { NetworkPerformer(httpClient: httpClient) }
 
         private static let lyricsEapiURL = "https://interface3.music.163.com/eapi/song/lyric/v1"
@@ -44,17 +47,31 @@ extension LyricsProviders.NetEase: _LyricsProvider {
             ]
         )
 
+        var searchRequest = try endpoint.buildRequest()
+
+        if let cookie = searchCookie.value {
+            searchRequest.setValue(cookie, forHTTPHeaderField: "Cookie")
+            if let data = try? await performer.executeReturningData(searchRequest),
+               let searchResult = try? performer.decode(data, as: NetEaseResponseSearchResult.self) {
+                return searchResult.result.songs.map(LyricsToken.init)
+            }
+            // A rejected or expired cookie: fall through and harvest a fresh one.
+            searchCookie.value = nil
+            searchRequest.setValue(nil, forHTTPHeaderField: "Cookie")
+        }
+
         // First pass to extract Set-Cookie. Use `value(forHTTPHeaderField:)` so the
         // lookup is case-insensitive and works under FoundationNetworking too.
-        var request1 = try endpoint.buildRequest()
-        let (_, firstResponse) = try await performer.execute(request1)
+        let (_, firstResponse) = try await performer.execute(searchRequest)
         if let setCookie = firstResponse.value(forHTTPHeaderField: "Set-Cookie"),
            let cookieIdx = setCookie.firstIndex(of: ";") {
-            request1.setValue(String(setCookie[..<cookieIdx]), forHTTPHeaderField: "Cookie")
+            let cookie = String(setCookie[..<cookieIdx])
+            searchRequest.setValue(cookie, forHTTPHeaderField: "Cookie")
+            searchCookie.value = cookie
         }
 
         // Second pass with cookie.
-        let data = try await performer.executeReturningData(request1)
+        let data = try await performer.executeReturningData(searchRequest)
         let searchResult: NetEaseResponseSearchResult = try performer.decode(data, as: NetEaseResponseSearchResult.self)
         return searchResult.result.songs.map(LyricsToken.init)
     }
@@ -101,6 +118,18 @@ extension LyricsProviders.NetEase: _LyricsProvider {
             serviceToken: "\(token.value.id)"
         )
         return lyrics
+    }
+}
+
+extension LyricsProviders.NetEase {
+    final class SearchCookie: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cookie: String?
+
+        var value: String? {
+            get { lock.withLock { cookie } }
+            set { lock.withLock { cookie = newValue } }
+        }
     }
 }
 
