@@ -31,7 +31,7 @@ extension LyricsProviders {
     /// single `completed`.  If the consumer cancels the stream, `completed` is
     /// suppressed — its absence is the signal for cancel/timeout vs. normal
     /// completion.
-    public enum ProviderEvent {
+    public enum ProviderEvent: Sendable {
         case providerStarted(source: String, request: LyricsSearchRequest)
         case candidate(source: String, lyrics: Lyrics)
         case providerFinished(source: String, request: LyricsSearchRequest, yieldedCount: Int)

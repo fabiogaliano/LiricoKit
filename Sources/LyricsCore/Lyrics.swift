@@ -1,18 +1,44 @@
 import Foundation
+import Synchronization
 
-public final class Lyrics: LosslessStringConvertible {
-    public var lines: [LyricsLine] = []
-    public var idTags: [IDTagKey: String] = [:]
-    public var metadata: Metadata = .init()
+public final class Lyrics: LosslessStringConvertible, Sendable {
+    private struct Content {
+        var lines: [LyricsLine]
+        var idTags: [IDTagKey: String]
+        var metadata: Metadata
+    }
+
+    // Lyrics outlive the search that found them: callers hand them between
+    // tasks, the main actor and display queues and keep editing them there
+    // (offset, filtering), so every access goes through one lock. An edit
+    // through a property, like `lines[i].enabled = false`, is a read and a
+    // separate write, so two threads editing one property can still lose an edit.
+    private let content: Mutex<Content>
+
+    public var lines: [LyricsLine] {
+        get { content.withLock { $0.lines } }
+        set { content.withLock { $0.lines = newValue } }
+    }
+
+    public var idTags: [IDTagKey: String] {
+        get { content.withLock { $0.idTags } }
+        set { content.withLock { $0.idTags = newValue } }
+    }
+
+    public var metadata: Metadata {
+        get { content.withLock { $0.metadata } }
+        set { content.withLock { $0.metadata = newValue } }
+    }
 
     public init(lines: [LyricsLine], idTags: [IDTagKey: String], metadata: Metadata = Metadata()) {
-        self.lines = lines
-        self.idTags = idTags
-        self.metadata = metadata
-        for idx in self.lines.indices {
-            self.lines[idx].lyrics = self
+        var metadata = metadata
+        metadata.attachmentTags = Set(lines.flatMap(\.attachments.content.keys))
+        content = Mutex(Content(lines: lines, idTags: idTags, metadata: metadata))
+        content.withLock { content in
+            for idx in content.lines.indices {
+                content.lines[idx].lyrics = self
+            }
         }
-        self.metadata.attachmentTags = Set(self.lines.flatMap(\.attachments.content.keys))
     }
 
     public convenience init?(_ description: String) {
@@ -25,7 +51,7 @@ public final class Lyrics: LosslessStringConvertible {
             }
         }
 
-        let lines = lyricsLineRegex.matches(in: description).flatMap { match -> [LyricsLine] in
+        var lines = lyricsLineRegex.matches(in: description).flatMap { match -> [LyricsLine] in
             let timeTagStr = match[1]!.string
             let timeTags = resolveTimeTag(timeTagStr)
 
@@ -48,7 +74,6 @@ public final class Lyrics: LosslessStringConvertible {
         guard !lines.isEmpty else {
             return nil
         }
-        self.init(lines: lines, idTags: idTags)
 
         var tags: Set<LyricsLine.Attachments.Tag> = []
         lyricsLineAttachmentRegex.matches(in: description).forEach { match in
@@ -59,34 +84,35 @@ public final class Lyrics: LosslessStringConvertible {
             let attachmentStr = match[3]?.string ?? ""
 
             for timeTag in timeTags {
-                switch lineIndex(of: timeTag) {
+                switch lines.lineIndex(of: timeTag) {
                 case .found(at: let index):
-                    self.lines[index].attachments[.init(attachmentTagStr)] = attachmentStr
+                    lines[index].attachments[.init(attachmentTagStr)] = attachmentStr
                     tags.insert(.init(attachmentTagStr))
                 case .notFound(insertAt: let index):
                     // `description` writes every line before its attachments, so an
                     // attachment with no line at its time is a line whose text starts with "[".
-                    var line = LyricsLine(content: "[\(attachmentTagStr)]\(attachmentStr)", position: timeTag)
-                    line.lyrics = self
-                    self.lines.insert(line, at: index)
+                    lines.insert(LyricsLine(content: "[\(attachmentTagStr)]\(attachmentStr)", position: timeTag), at: index)
                 }
             }
         }
-        metadata.data[.attachmentTags] = tags
+        self.init(lines: lines, idTags: idTags)
+        content.withLock { $0.metadata.attachmentTags = tags }
     }
 
     public var description: String {
+        let (idTags, lines) = content.withLock { ($0.idTags, $0.lines) }
         let components = idTags.map { "[\($0.key.rawValue):\($0.value)]" }
             + lines.map(\.description)
         return components.joined(separator: "\n")
     }
 
     public var legacyDescription: String {
+        let (idTags, lines) = content.withLock { ($0.idTags, $0.lines) }
         let components = idTags.map { "[\($0.key.rawValue):\($0.value)]" } + lines.map { "[\($0.timeTag)]\($0.content)" + ($0.attachments.translation().map { "【\($0)】" } ?? "") }
         return components.joined(separator: "\n")
     }
 
-    public struct IDTagKey: RawRepresentable, Hashable {
+    public struct IDTagKey: RawRepresentable, Hashable, Sendable {
         public var rawValue: String
 
         public init(_ rawValue: String) {
@@ -106,14 +132,14 @@ public final class Lyrics: LosslessStringConvertible {
         public static let length = IDTagKey("length")
     }
 
-    public struct Metadata {
-        public var data: [Key: Any]
+    public struct Metadata: Sendable {
+        public var data: [Key: any Sendable]
 
-        public init(data: [Key: Any] = [:]) {
+        public init(data: [Key: any Sendable] = [:]) {
             self.data = data
         }
 
-        public struct Key: RawRepresentable, Hashable {
+        public struct Key: RawRepresentable, Hashable, Sendable {
             public var rawValue: String
 
             public init(_ rawValue: String) {
@@ -133,7 +159,7 @@ extension Lyrics {
             return idTags[.offset].flatMap { Int($0) } ?? 0
         }
         set {
-            idTags[.offset] = "\(newValue)"
+            content.withLock { $0.idTags[.offset] = "\(newValue)" }
         }
     }
 
@@ -158,29 +184,43 @@ extension Lyrics {
         }
         set {
             guard let newValue = newValue else {
-                idTags.removeValue(forKey: .length)
+                content.withLock { _ = $0.idTags.removeValue(forKey: .length) }
                 return
             }
             let fmt = NumberFormatter()
             fmt.minimumFractionDigits = 0
             fmt.maximumFractionDigits = 2
             let str = fmt.string(from: newValue as NSNumber)
-            idTags[.length] = str
+            content.withLock { $0.idTags[.length] = str }
         }
     }
 
-    fileprivate enum Match {
-        case found(at: Int)
-        case notFound(insertAt: Int)
+    public subscript(_ position: TimeInterval) -> (currentLineIndex: Int?, nextLineIndex: Int?) {
+        let lines = self.lines
+        let index: Int
+        switch lines.lineIndex(of: position) {
+        case .found(at: let i): index = i + 1
+        case .notFound(insertAt: let i): index = i
+        }
+        let current = (0 ..< index).reversed().first { lines[$0].enabled }
+        let next = lines[index...].firstIndex(where: \.enabled)
+        return (current, next)
     }
+}
 
-    fileprivate func lineIndex(of position: TimeInterval) -> Match {
+private enum LineMatch {
+    case found(at: Int)
+    case notFound(insertAt: Int)
+}
+
+extension [LyricsLine] {
+    fileprivate func lineIndex(of position: TimeInterval) -> LineMatch {
         var left = 0
-        var right = lines.count - 1
+        var right = count - 1
 
         while left <= right {
             let mid = (left + right) / 2
-            let candidate = lines[mid]
+            let candidate = self[mid]
             if candidate.position < position {
                 left = mid + 1
             } else if position < candidate.position {
@@ -191,24 +231,17 @@ extension Lyrics {
         }
         return .notFound(insertAt: left)
     }
-
-    public subscript(_ position: TimeInterval) -> (currentLineIndex: Int?, nextLineIndex: Int?) {
-        let index: Int
-        switch lineIndex(of: position) {
-        case .found(at: let i): index = i + 1
-        case .notFound(insertAt: let i): index = i
-        }
-        let current = (0 ..< index).reversed().first { lines[$0].enabled }
-        let next = lines[index...].firstIndex(where: \.enabled)
-        return (current, next)
-    }
 }
 
 extension Lyrics {
     public func filtrate(isIncluded predicate: NSPredicate) {
-        for (index, lyric) in lines.enumerated() {
-            if !predicate.evaluate(with: lyric) {
-                lines[index].enabled = false
+        // The predicate is caller code that may read these lyrics, so it can't
+        // run while the lock is held.
+        let lines = self.lines
+        let excluded = lines.indices.filter { !predicate.evaluate(with: lines[$0]) }
+        content.withLock { content in
+            for index in excluded where content.lines.indices.contains(index) {
+                content.lines[index].enabled = false
             }
         }
     }

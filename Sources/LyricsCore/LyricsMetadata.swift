@@ -1,7 +1,7 @@
 import Foundation
 
 extension Lyrics.Metadata.Key {
-    public static var attachmentTags = Lyrics.Metadata.Key("attachmentTags")
+    public static let attachmentTags = Lyrics.Metadata.Key("attachmentTags")
 }
 
 extension Lyrics.Metadata {

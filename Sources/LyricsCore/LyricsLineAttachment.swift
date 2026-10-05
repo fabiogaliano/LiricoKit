@@ -1,18 +1,18 @@
 import Foundation
 
-public protocol LyricsLineAttachment: LosslessStringConvertible {}
+public protocol LyricsLineAttachment: LosslessStringConvertible, Sendable {}
 
 // MARK: - LyricsLine.Attachments
 
 extension LyricsLine {
-    public struct Attachments {
+    public struct Attachments: Sendable {
         var content: [Tag: LyricsLineAttachment]
 
         public init(attachments: [Tag: LyricsLineAttachment] = [:]) {
             self.content = attachments
         }
 
-        public struct Tag: RawRepresentable, Equatable, Hashable {
+        public struct Tag: RawRepresentable, Equatable, Hashable, Sendable {
             public var rawValue: String
 
             public init(rawValue: String) {
@@ -152,7 +152,7 @@ extension LyricsLine.Attachments {
 
 extension LyricsLine.Attachments {
     public struct InlineTimeTag: LyricsLineAttachment {
-        public struct Tag {
+        public struct Tag: Sendable {
             public var index: Int
             public var time: TimeInterval // time offset since the line begining
 
@@ -222,7 +222,7 @@ extension LyricsLine.Attachments.InlineTimeTag.Tag: LosslessStringConvertible {
 
 extension LyricsLine.Attachments {
     public struct RangeAttribute: LyricsLineAttachment {
-        public struct Attribute {
+        public struct Attribute: Sendable {
             public var range: Range<Int>
             public var content: String
 
