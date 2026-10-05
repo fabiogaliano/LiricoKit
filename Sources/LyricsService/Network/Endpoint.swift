@@ -14,6 +14,11 @@ struct Endpoint: Sendable {
     var headers: [String: String] = [:]
     var body: Data?
     var cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
+    var timeoutInterval: TimeInterval = Endpoint.defaultTimeoutInterval
+
+    /// URLSession's 60 s default outlives a caller's whole search (Lirico gives
+    /// up after 15 s), so a stalled host would never be reported as failed.
+    static let defaultTimeoutInterval: TimeInterval = 10
 
     func buildRequest() throws -> URLRequest {
         var components = URLComponents()
@@ -26,7 +31,7 @@ struct Endpoint: Sendable {
         guard let url = components.url else {
             throw LyricsProviderError.invalidURL(urlString: "\(scheme)://\(host)\(path)")
         }
-        var request = URLRequest(url: url, cachePolicy: cachePolicy)
+        var request = URLRequest(url: url, cachePolicy: cachePolicy, timeoutInterval: timeoutInterval)
         request.httpMethod = method.rawValue
         request.httpBody = body
         for (key, value) in headers {
@@ -56,7 +61,7 @@ extension Endpoint {
         else {
             throw LyricsProviderError.invalidURL(urlString: urlString)
         }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, timeoutInterval: defaultTimeoutInterval)
         request.httpMethod = method.rawValue
         request.httpBody = body
         for (key, value) in headers {

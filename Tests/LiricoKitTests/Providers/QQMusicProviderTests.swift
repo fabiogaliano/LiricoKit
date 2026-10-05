@@ -88,8 +88,8 @@ struct QQMusicProviderTests {
         #expect(lyrics.isEmpty)
     }
 
-    @Test func desktopSearchLeadsAndDuplicatesAreFetchedOnce() async throws {
-        let mock = MockHTTPClient()
+    /// Desktop search (mid222) and smartbox search (mid111, mid222) overlap on mid222.
+    private func stubOverlappingSearches(_ mock: MockHTTPClient) throws {
         let api1 = #"{"code":0,"data":{"song":{"itemlist":[{"id":"111","mid":"mid111","name":"Test Song","singer":"Test Artist"},{"id":"222","mid":"mid222","name":"Test Song","singer":"Test Artist"}]}}}"#
         let api2 = #"{"req_1":{"code":0,"data":{"body":{"song":{"list":[{"mid":"mid222","name":"Test Song","id":222,"singer":[{"name":"Test Artist"}],"album":{"mid":"albumMid222"}}]}}}}}"#
         mock.stub(path: "/splcloud/fcgi-bin/smartbox_new.fcg", response: .data(Data(api1.utf8)))
@@ -101,13 +101,36 @@ struct QQMusicProviderTests {
         mock.stub(path: "/cgi-bin/musicu.fcg", response: .data(Data(api2.utf8)))
         mock.stub(path: "/qqmusic/fcgi-bin/lyric_download.fcg",
                   response: .data(try FixtureLoader.data(named: "QQMusic/lyrics.xml")))
+    }
+
+    @Test func duplicatesAcrossEndpointsAreFetchedOnce() async throws {
+        let mock = MockHTTPClient()
+        try stubOverlappingSearches(mock)
 
         let provider = LyricsProviders.QQMusic(httpClient: mock)
         let lyrics = try await collect(provider.lyrics(for: infoRequest))
 
-        #expect(lyrics.map(\.metadata.serviceToken) == ["mid222", "mid111"])
+        // Fetches yield as they finish, so only the set of results is stable.
+        #expect(Set(lyrics.compactMap(\.metadata.serviceToken)) == ["mid222", "mid111"])
         let lyricRequests = mock.recorded.filter { $0.url?.path == "/qqmusic/fcgi-bin/lyric_download.fcg" }
         #expect(lyricRequests.count == 2)
+    }
+
+    @Test func desktopSearchLeadsSoItWinsALimitedFetch() async throws {
+        let mock = MockHTTPClient()
+        try stubOverlappingSearches(mock)
+        let singleResultRequest = LyricsSearchRequest(
+            searchTerm: .info(title: "Test Song", artist: "Test Artist"),
+            duration: 200,
+            limit: 1
+        )
+
+        let provider = LyricsProviders.QQMusic(httpClient: mock)
+        let lyrics = try await collect(provider.lyrics(for: singleResultRequest))
+
+        #expect(lyrics.map(\.metadata.serviceToken) == ["mid222"])
+        let lyricRequests = mock.recorded.filter { $0.url?.path == "/qqmusic/fcgi-bin/lyric_download.fcg" }
+        #expect(lyricRequests.count == 1)
     }
 
     @Test func desktopSearchAlbumSkipsCoverLookup() async throws {

@@ -30,28 +30,30 @@ extension _LyricsProvider {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let tokens = try await self.search(for: request)
-                    let limitedTokens = tokens.prefix(request.limit)
+                    let tokens = try await self.search(for: request).prefix(request.limit)
 
-                    let fetchTasks: [Task<Lyrics, Error>] = limitedTokens.map { token in
-                        Task {
-                            let lrc = try await self.fetch(with: token)
-                            lrc.metadata.request = request
-                            lrc.metadata.service = Self.service
-                            return lrc
+                    // Child tasks so that cancelling the stream cancels in-flight
+                    // fetches, and so one slow fetch can't hold back finished ones.
+                    await withTaskGroup(of: Lyrics?.self) { taskGroup in
+                        for token in tokens {
+                            taskGroup.addTask {
+                                do {
+                                    let lrc = try await self.fetch(with: token)
+                                    lrc.metadata.request = request
+                                    lrc.metadata.service = Self.service
+                                    return lrc
+                                } catch {
+                                    if !Task.isCancelled {
+                                        LyricsProviderLog.fetchTaskFailed(error)
+                                    }
+                                    return nil
+                                }
+                            }
                         }
-                    }
-
-                    for task in fetchTasks {
-                        if Task.isCancelled {
-                            task.cancel()
-                            continue
-                        }
-                        do {
-                            let lyric = try await task.value
-                            continuation.yield(lyric)
-                        } catch {
-                            LyricsProviderLog.fetchTaskFailed(error)
+                        for await lyric in taskGroup {
+                            if let lyric {
+                                continuation.yield(lyric)
+                            }
                         }
                     }
 

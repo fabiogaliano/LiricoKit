@@ -38,6 +38,13 @@ struct EndpointTests {
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     }
 
+    @Test func requestsTimeOutAfterTenSeconds() throws {
+        let built = try Endpoint(host: "example.com", path: "/api").buildRequest()
+        let absolute = try Endpoint.absolute("https://example.com/api")
+        #expect(built.timeoutInterval == 10)
+        #expect(absolute.timeoutInterval == 10)
+    }
+
     @Test func buildRequestThrowsInvalidURLOnInconsistentComponents() {
         // URLComponents.url is nil when an authority component is present but the path
         // does not start with "/" (RFC 3986 §3.3).

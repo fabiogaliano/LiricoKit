@@ -27,55 +27,12 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
 
     static let service: String = "LRCLIB"
 
-    // MARK: – Dual-path lyrics(for:) override
-
-    /// Overrides the default _LyricsProvider implementation to run the broad
-    /// /api/search path and the exact /api/get signature-lookup path concurrently
-    /// when title+artist+album+duration are all present, deduplicating by LRCLIB id.
-    func lyrics(for request: LyricsSearchRequest) -> AsyncThrowingStream<Lyrics, Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let tokens = try await self.gatherTokens(for: request)
-                    let limitedTokens = tokens.prefix(request.limit)
-
-                    let fetchTasks: [Task<Lyrics, Error>] = limitedTokens.map { token in
-                        Task {
-                            let lrc = try await self.fetch(with: token)
-                            lrc.metadata.request = request
-                            lrc.metadata.service = Self.service
-                            return lrc
-                        }
-                    }
-
-                    for fetchTask in fetchTasks {
-                        if Task.isCancelled {
-                            fetchTask.cancel()
-                            continue
-                        }
-                        do {
-                            let lyric = try await fetchTask.value
-                            continuation.yield(lyric)
-                        } catch {
-                            LyricsProviderLog.fetchTaskFailed(error)
-                        }
-                    }
-
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
-
     // MARK: – Token gathering with dual-path + dedupe
 
-    /// Runs the applicable search paths concurrently, deduplicates by LRCLIB id,
-    /// and surfaces partial-failure tolerance: one failing path does not suppress
-    /// results from a succeeding path.
-    private func gatherTokens(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
+    /// Runs the broad /api/search path and, when title+artist+album+duration are
+    /// all present, the exact /api/get signature lookup concurrently, deduplicating
+    /// by LRCLIB id. One failing path does not suppress results from the other.
+    func search(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
         guard case .info(let title, let artist) = request.searchTerm,
               let albumName = request.albumName,
               !albumName.isEmpty,
@@ -83,12 +40,12 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
         else {
             // Keyword searches, or info searches missing album/duration:
             // fall through to the broad /api/search path only.
-            return try await search(for: request)
+            return try await broadSearch(for: request)
         }
 
         // Both paths run concurrently; errors are captured independently so a failure
         // on one path (e.g. 404 from exact lookup) does not suppress the other's results.
-        async let broadTask: [LyricsToken] = broadSearch(title: title, artist: artist)
+        async let broadTask: [LyricsToken] = broadSearch(for: request)
         async let exactTask: LyricsToken? = exactSignatureLookup(
             title: title,
             artist: artist,
@@ -118,9 +75,7 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
     // MARK: – Search paths
 
     /// Broad /api/search — used for all request types (keyword + info).
-    /// Called by the default _LyricsProvider.search(for:) contract; also invoked
-    /// directly by gatherTokens when only one path is needed.
-    func search(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
+    private func broadSearch(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
         let queryItems: [URLQueryItem]
         switch request.searchTerm {
         case .keyword(let keyword):
@@ -131,18 +86,6 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
                 URLQueryItem(name: "artist_name", value: artist),
             ]
         }
-        return try await broadSearch(queryItems: queryItems)
-    }
-
-    private func broadSearch(title: String, artist: String) async throws -> [LyricsToken] {
-        let queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "track_name", value: title),
-            URLQueryItem(name: "artist_name", value: artist),
-        ]
-        return try await broadSearch(queryItems: queryItems)
-    }
-
-    private func broadSearch(queryItems: [URLQueryItem]) async throws -> [LyricsToken] {
         let endpoint = Endpoint(
             host: "lrclib.net",
             path: "/api/search",
