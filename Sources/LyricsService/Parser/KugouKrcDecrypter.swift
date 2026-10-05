@@ -12,8 +12,12 @@ func decryptKugouKrc(_ data: Data) -> String? {
         return byte ^ decodeKey[index & 0b1111]
     }
 
+    // A zlib header plus at least one byte of deflate stream.
+    guard decrypted.count > 2 else {
+        return nil
+    }
     decrypted.removeFirst(2)
-    
+
     guard let unarchivedData = try? (Data(decrypted) as NSData).decompressed(using: .zlib) else {
         return nil
     }
