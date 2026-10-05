@@ -1,5 +1,6 @@
+import CommonCrypto
+import CryptoKit
 import Foundation
-import CryptoSwift
 import FoundationToolbox
 
 @Loggable
@@ -105,17 +106,32 @@ struct NetEaseEapiClient: Sendable {
     }
 
     static func aesEncryptECB(data: Data, key: Data) throws -> Data {
-        do {
-            let aes = try AES(key: Array(key), blockMode: ECB(), padding: .pkcs7)
-            let encrypted = try aes.encrypt(Array(data))
-            return Data(encrypted)
-        } catch {
-            throw LyricsProviderError.processingFailed(reason: "AES ECB encryption failed: \(error.localizedDescription)")
+        // PKCS#7 always pads, so the output is at most one block longer than the input.
+        var encrypted = Data(count: data.count + kCCBlockSizeAES128)
+        var encryptedCount = 0
+        let status = encrypted.withUnsafeMutableBytes { encryptedBytes in
+            data.withUnsafeBytes { dataBytes in
+                key.withUnsafeBytes { keyBytes in
+                    CCCrypt(
+                        CCOperation(kCCEncrypt),
+                        CCAlgorithm(kCCAlgorithmAES),
+                        CCOptions(kCCOptionECBMode | kCCOptionPKCS7Padding),
+                        keyBytes.baseAddress, keyBytes.count,
+                        nil,
+                        dataBytes.baseAddress, dataBytes.count,
+                        encryptedBytes.baseAddress, encryptedBytes.count,
+                        &encryptedCount
+                    )
+                }
+            }
         }
+        guard status == kCCSuccess else {
+            throw LyricsProviderError.processingFailed(reason: "AES ECB encryption failed with CommonCrypto status \(status)")
+        }
+        return encrypted.prefix(encryptedCount)
     }
 
     static func md5Hash(_ string: String) -> String {
-        guard let data = string.data(using: .utf8) else { return "" }
-        return Array(data).md5().map { String(format: "%02x", $0) }.joined()
+        Insecure.MD5.hash(data: Data(string.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -21,7 +21,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ddddxxx/Regex", from: "1.0.1"),
-        .package(url: "https://github.com/krzyzanowskim/CryptoSwift", from: "1.9.0"),
         .package(url: "https://github.com/Mx-Iris/FrameworkToolbox", from: "0.5.4"),
     ],
     targets: [
@@ -43,7 +42,6 @@ let package = Package(
             dependencies: [
                 "LyricsCore",
                 .product(name: "Regex", package: "Regex"),
-                .product(name: "CryptoSwift", package: "CryptoSwift"),
                 .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
             ]
         ),
