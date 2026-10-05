@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1
+
+- fix building with Swift 6.3 (Xcode 26.6), which resolved the LRC and lyrics-format patterns to Regex's throwing initializer
+
 ## 3.0.0
 
 - **breaking:** require macOS 15 (was 10.15)

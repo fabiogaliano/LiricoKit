@@ -5,7 +5,7 @@ Lyrics search and parsing engine for [Lirico](https://github.com/fabiogaliano/Li
 ## Installation
 
 ```swift
-.package(url: "https://github.com/fabiogaliano/LiricoKit", from: "3.0.0")
+.package(url: "https://github.com/fabiogaliano/LiricoKit", from: "3.0.1")
 ```
 
 Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music support, links WebKit). Requires macOS 15 and Swift 6.2 (Xcode 26).
