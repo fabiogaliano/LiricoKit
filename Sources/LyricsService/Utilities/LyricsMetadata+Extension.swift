@@ -7,8 +7,6 @@ extension Lyrics.Metadata.Key {
     public static var artworkURL = Lyrics.Metadata.Key("artworkURL")
     public static var service = Lyrics.Metadata.Key("service")
     public static var serviceToken = Lyrics.Metadata.Key("serviceToken")
-
-    static var searchIndex = Lyrics.Metadata.Key("searchIndex")
 }
 
 extension Lyrics.Metadata {
@@ -35,11 +33,6 @@ extension Lyrics.Metadata {
     public var serviceToken: String? {
         get { return data[.serviceToken] as? String }
         set { data[.serviceToken] = newValue }
-    }
-
-    var searchIndex: Int {
-        get { return data[.searchIndex] as? Int ?? 0 }
-        set { data[.searchIndex] = newValue }
     }
 }
 

@@ -15,14 +15,6 @@ extension LyricsProviders {
 extension LyricsProviders.LRCLIB: _LyricsProvider {
     struct LyricsToken {
         let value: LRCLIBResponse
-        /// True when this token came from the exact /api/get signature lookup
-        /// (vs. the broad /api/search path). Used to resolve dedupe tie-breaks.
-        let fromExactLookup: Bool
-
-        init(value: LRCLIBResponse, fromExactLookup: Bool = false) {
-            self.value = value
-            self.fromExactLookup = fromExactLookup
-        }
     }
 
     static let service: String = "LRCLIB"
@@ -92,7 +84,7 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
             queryItems: queryItems
         )
         let results: [LRCLIBResponse] = try await performer.performJSON(endpoint)
-        return results.filter(\.hasSyncedLyrics).map { LyricsToken(value: $0, fromExactLookup: false) }
+        return results.filter(\.hasSyncedLyrics).map { LyricsToken(value: $0) }
     }
 
     /// Exact /api/get signature lookup: takes structured query params and returns a
@@ -115,7 +107,7 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
         )
         let response: LRCLIBResponse = try await performer.performJSON(endpoint)
         guard response.hasSyncedLyrics else { return nil }
-        return LyricsToken(value: response, fromExactLookup: true)
+        return LyricsToken(value: response)
     }
 
     // MARK: – Deduplication
