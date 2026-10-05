@@ -19,7 +19,6 @@ public struct AppleMusicCatalogSong: Sendable, Equatable {
 /// developer token (and the user token, once `MusicAuthorization` is granted)
 /// automatically — no WKWebView and no manual token handling. Requires the
 /// MusicKit App Service to be enabled on the host app's App ID.
-@available(macOS 12.0, *)
 public struct AppleMusicCatalog: Sendable {
 
     public init() {}

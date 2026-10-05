@@ -19,7 +19,6 @@ import WebKit
 ///
 /// The user signs in once with their own Apple ID; the persistent website data
 /// store keeps that session across launches.
-@available(macOS 12.0, *)
 @MainActor
 public final class AppleMusicWebSession {
 

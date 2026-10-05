@@ -26,7 +26,6 @@ import MusicKit
 /// It only ever *adds* requests. When the track is not from Apple Music,
 /// when Apple Music access is not authorized, or on any failure it returns
 /// an empty array — the direct search is unaffected.
-@available(macOS 12.0, *)
 public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
 
     /// `userInfo` flag (`"1"`) set by the app when the now-playing track is
