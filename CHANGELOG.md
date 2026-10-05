@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **breaking:** require macOS 15 (was 10.15)
+- **breaking:** build in the Swift 6 language mode. `Lyrics`, `LyricsLine` (with its attachments and tag types) and `LyricsProviders.ProviderEvent` are now `Sendable`, so `@preconcurrency import` of LiricoKit modules is no longer needed; it would only turn Sendable errors into warnings now that LiricoKit is concurrency-checked
+- `Lyrics` keeps its lines, ID tags and metadata behind a lock. Each property read or write is atomic, but an edit through a property such as `lyrics.lines[i].enabled = false` is a read and a separate write
+- **breaking:** `Lyrics.Metadata.data` is `[Key: any Sendable]` (was `[Key: Any]`), `LyricsLineAttachment` requires `Sendable`, and the predefined `Lyrics.Metadata.Key`s are constants (`static let`)
+- **breaking:** drop the CryptoSwift and FrameworkToolbox dependencies (and swift-syntax with them). NetEase uses CommonCrypto and CryptoKit; logging uses `os.Logger` under the subsystem `com.fabiogaliano.LiricoKit`, with the provider name as the category. Apps that imported either package through LiricoKit must depend on it directly
 - **breaking:** remove the `LyricsServiceUI` module (source icon drawing); `LiricoKit` no longer re-exports it
 - **breaking:** remove `Lyrics.quality`, `Lyrics.isMatched()` and `Lyrics.generateFurigana()`
 - **breaking:** remove `LyricsProviders.Group.lyrics(for:)`; `Group` no longer conforms to `LyricsProvider` (it is still `Sendable`). Use `events(for:)`
@@ -15,6 +20,7 @@
 - yield each provider's results as their downloads finish, so one slow download no longer holds back the rest; results within a provider no longer arrive in search-rank order
 - time out each request after 10 s instead of URLSession's 60 s
 - fail a provider (`providerFailed` in `Group.events(for:)`) when its search found songs but none of the lyrics downloads reached the service; downloads that reach it and find no lyrics still finish with zero results
+- Musixmatch: report HTTP 401 as "Invalid Musixmatch token" again instead of "HTTP status 401"
 - LRCLIB: skip records without synced lyrics before applying the request's `limit`, and stop refetching them by id
 - QQ Music: clean up the XML response in linear time (was seconds on long lyrics)
 - drop the unused BigInt and swift-async-algorithms dependencies

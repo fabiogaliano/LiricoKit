@@ -5,10 +5,10 @@ Lyrics search and parsing engine for [Lirico](https://github.com/fabiogaliano/Li
 ## Installation
 
 ```swift
-.package(url: "https://github.com/fabiogaliano/LiricoKit", from: "2.0.0")
+.package(url: "https://github.com/fabiogaliano/LiricoKit", from: "3.0.0")
 ```
 
-Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music support, links WebKit).
+Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music support, links WebKit). Requires macOS 15 and Swift 6.2 (Xcode 26).
 
 ## Supported Sources
 
@@ -25,6 +25,8 @@ Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music 
 
 ## What's New (unreleased)
 
+- **Breaking:** requires macOS 15 and builds in the Swift 6 language mode. `Lyrics`, `LyricsLine` and `ProviderEvent` are `Sendable`, so LiricoKit no longer needs `@preconcurrency import`. `Lyrics.Metadata.data` holds `any Sendable` values.
+- **Breaking:** no longer depends on CryptoSwift or FrameworkToolbox; the only third-party dependency is Regex.
 - **Breaking:** removed the `LyricsServiceUI` module, `Lyrics.quality`, `Lyrics.isMatched()`, `Lyrics.generateFurigana()` and `LyricsProviders.Group.lyrics(for:)`. `Group` is no longer a `LyricsProvider`; search several sources with `Group.events(for:)`.
 - Parsing, cancellation, timeout and error-reporting fixes; see the [changelog](CHANGELOG.md).
 
