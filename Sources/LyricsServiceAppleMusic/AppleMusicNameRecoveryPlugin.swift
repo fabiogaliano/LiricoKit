@@ -204,6 +204,5 @@ public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
         let artist: String
     }
 
-    private static let log = Logger(
-        subsystem: "LiricoKit.AppleMusic", category: "NameRecovery")
+    private static let log = Logger.liricoKit(category: "AppleMusicNameRecovery")
 }

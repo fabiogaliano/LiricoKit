@@ -1,10 +1,11 @@
 import Foundation
 import LyricsCore
-import FoundationToolbox
+import os
 
 extension LyricsProviders {
-    @Loggable
     final class QQMusic {
+        private static let logger = Logger.liricoKit(category: "QQMusic")
+
         let httpClient: HTTPClient
         private var performer: NetworkPerformer { NetworkPerformer(httpClient: httpClient) }
 
@@ -52,7 +53,7 @@ extension LyricsProviders.QQMusic: _LyricsProvider {
             let result: QQResponseSearchResult = try await performer.performJSON(endpoint)
             return result.data.song.list.map { LyricsToken(value: $0) }
         } catch {
-            #log(.error, "QQMusic search API 1 failed: \(error)")
+            Self.logger.error("QQMusic search API 1 failed: \(error)")
             return []
         }
     }
@@ -84,7 +85,7 @@ extension LyricsProviders.QQMusic: _LyricsProvider {
             guard result.request.code == 0 else { return [] }
             return result.request.data.body.song.list.map { LyricsToken(value: $0) }
         } catch {
-            #log(.error, "QQMusic search API 2 failed: \(error)")
+            Self.logger.error("QQMusic search API 2 failed: \(error)")
             return []
         }
     }

@@ -1,6 +1,5 @@
 import Foundation
 import LyricsCore
-import FoundationToolbox
 
 enum QQMusicXMLDecoder {
     static func decodeLyricContents(from document: XMLDocument) -> [String: String] {

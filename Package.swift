@@ -21,7 +21,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ddddxxx/Regex", from: "1.0.1"),
-        .package(url: "https://github.com/Mx-Iris/FrameworkToolbox", from: "0.5.4"),
     ],
     targets: [
         .target(
@@ -42,7 +41,6 @@ let package = Package(
             dependencies: [
                 "LyricsCore",
                 .product(name: "Regex", package: "Regex"),
-                .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
             ]
         ),
         .target(
