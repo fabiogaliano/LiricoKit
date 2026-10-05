@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.0.0
 
 - **breaking:** require macOS 15 (was 10.15)
 - **breaking:** build in the Swift 6 language mode. `Lyrics`, `LyricsLine` (with its attachments and tag types) and `LyricsProviders.ProviderEvent` are now `Sendable`, so `@preconcurrency import` of LiricoKit modules is no longer needed; it would only turn Sendable errors into warnings now that LiricoKit is concurrency-checked
