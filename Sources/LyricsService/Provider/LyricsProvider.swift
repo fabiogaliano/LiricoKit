@@ -34,27 +34,45 @@ extension _LyricsProvider {
 
                     // Child tasks so that cancelling the stream cancels in-flight
                     // fetches, and so one slow fetch can't hold back finished ones.
-                    await withTaskGroup(of: Lyrics?.self) { taskGroup in
+                    let unreachable = await withTaskGroup(of: Result<Lyrics, Error>.self) { taskGroup -> Error? in
                         for token in tokens {
                             taskGroup.addTask {
                                 do {
                                     let lrc = try await self.fetch(with: token)
                                     lrc.metadata.request = request
                                     lrc.metadata.service = Self.service
-                                    return lrc
+                                    return .success(lrc)
                                 } catch {
-                                    if !Task.isCancelled {
-                                        LyricsProviderLog.fetchTaskFailed(error)
-                                    }
-                                    return nil
+                                    return .failure(error)
                                 }
                             }
                         }
-                        for await lyric in taskGroup {
-                            if let lyric {
+
+                        // A fetch that finds no lyrics still got an answer. Callers show
+                        // "not found" and "failed" differently, so only fail the stream
+                        // when no fetch reached the service at all.
+                        var serviceAnswered = false
+                        var transportFailure: Error?
+                        for await result in taskGroup {
+                            switch result {
+                            case .success(let lyric):
+                                serviceAnswered = true
                                 continuation.yield(lyric)
+                            case .failure(let error):
+                                if !Task.isCancelled {
+                                    LyricsProviderLog.fetchTaskFailed(error)
+                                }
+                                if error.isTransportFailure {
+                                    transportFailure = transportFailure ?? error
+                                } else {
+                                    serviceAnswered = true
+                                }
                             }
                         }
+                        return serviceAnswered ? nil : transportFailure
+                    }
+                    if let unreachable {
+                        throw unreachable
                     }
 
                     continuation.finish()
@@ -63,6 +81,17 @@ extension _LyricsProvider {
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+extension Error {
+    fileprivate var isTransportFailure: Bool {
+        switch self as? LyricsProviderError {
+        case .networkError?, .httpError?:
+            return true
+        default:
+            return false
         }
     }
 }

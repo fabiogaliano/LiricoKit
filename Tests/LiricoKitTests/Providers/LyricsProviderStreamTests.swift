@@ -105,3 +105,67 @@ struct LyricsProviderStreamTests {
         #expect(slowEnd?.wasCancelled == true)
     }
 }
+
+/// A provider whose fetches fail the way real ones do.
+private struct FailingFetchProvider: _LyricsProvider {
+    enum LyricsToken: Sendable {
+        case unreachable
+        case noLyrics
+    }
+
+    static let service = "Failing"
+
+    let tokens: [LyricsToken]
+
+    func search(for request: LyricsSearchRequest) async throws -> [LyricsToken] {
+        tokens
+    }
+
+    func fetch(with token: LyricsToken) async throws -> Lyrics {
+        switch token {
+        case .unreachable:
+            throw LyricsProviderError.networkError(underlyingError: URLError(.timedOut))
+        case .noLyrics:
+            throw LyricsProviderError.processingFailed(reason: "No valid lyric content found.")
+        }
+    }
+}
+
+struct LyricsProviderFailureTests {
+    private let request = LyricsSearchRequest(searchTerm: .info(title: "T", artist: "A"), duration: 200)
+
+    @Test func everyFetchUnreachableFailsTheStream() async throws {
+        let provider = FailingFetchProvider(tokens: [.unreachable, .unreachable])
+
+        await #expect(throws: LyricsProviderError.self) {
+            _ = try await collect(provider.lyrics(for: self.request))
+        }
+    }
+
+    @Test func fetchesThatFindNoLyricsFinishEmpty() async throws {
+        let provider = FailingFetchProvider(tokens: [.noLyrics, .unreachable])
+
+        let lyrics = try await collect(provider.lyrics(for: request))
+        #expect(lyrics.isEmpty)
+    }
+
+    @Test func groupReportsAnUnreachableLyricsHostAsProviderFailed() async throws {
+        let mock = MockHTTPClient()
+        mock.stub(host: "mobilecdn.kugou.com", response: .data(try FixtureLoader.data(named: "Kugou/search.json")))
+        mock.stub(host: "krcs.kugou.com", response: .error(URLError(.timedOut)))
+        let group = LyricsProviders.Group(descriptors: [
+            .init(source: "Kugou", provider: LyricsProviders.Kugou(httpClient: mock)),
+        ])
+
+        var outcomes: [String] = []
+        for await event in group.events(for: request) {
+            switch event {
+            case .providerFinished(_, _, let count): outcomes.append("finished(\(count))")
+            case .providerFailed(_, _, _, let count): outcomes.append("failed(\(count))")
+            default: break
+            }
+        }
+
+        #expect(outcomes == ["failed(0)"])
+    }
+}
