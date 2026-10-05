@@ -16,7 +16,6 @@ Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music 
 - QQ Music
 - Kugou Music
 - LRCLIB
-- Spotify
 - Musixmatch
 - <del>TTPod</del>
 - <del>Gecimi</del>
@@ -37,45 +36,50 @@ Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music 
 
 ## Usage
 
-#### Search lyrics from the internet
+#### Search one source
 
 ```swift
-import LyricsService
+import LiricoKit
 
-// create a search request
-let song = "Tranquilize"
-let artist = "The Killers"
-let duration = 225.2
-let searchReq = LyricsSearchRequest(
-    searchTerm: .info(title: song, artist: artist),
-    duration: duration
+let request = LyricsSearchRequest(
+    searchTerm: .info(title: "Tranquilize", artist: "The Killers"),
+    duration: 225.2
 )
 
-// choose a lyrics service provider
-let provider = LyricsProviders.Kugou()
-// or search from multiple sources
-let provider = LyricsProviders.Group(service: [.kugou, .netease, .qq])
-
-// search
-provider.lyricsPublisher(request: searchReq).sink { lyrics in
+let kugou = LyricsProviders.Service.kugou.create()
+for try await lyrics in kugou.lyrics(for: request) {
     print(lyrics)
 }
 ```
 
-#### Provider lifecycle events and canonical source names
+Each source's results arrive as they finish downloading, not in search-rank order. The stream throws when the search fails, or when none of the lyrics downloads reach the service.
+
+#### Search several sources
+
+`Group` runs its sources concurrently and reports each one's progress as events. A failing source never stops the others.
 
 ```swift
-import LyricsService
-
 let group = LyricsProviders.Group(descriptors: [
-    .init(source: "Kugou", provider: LyricsProviders.Kugou()),
-    .init(source: "NetEase", provider: LyricsProviders.NetEase()),
+    .init(source: "Kugou", provider: LyricsProviders.Service.kugou.create()),
+    .init(source: "NetEase", provider: LyricsProviders.Service.netease.create()),
+    .init(source: "LRCLIB", provider: LyricsProviders.Service.lrclib.create()),
 ])
 
-for await event in group.events(for: searchReq) {
-    print(event)
+for await event in group.events(for: request) {
+    switch event {
+    case .candidate(let source, let lyrics):
+        print(source, lyrics.idTags[.title] ?? "")
+    case .providerFailed(let source, _, let message, _):
+        print("\(source) failed: \(message)")
+    case .completed:
+        print("done")
+    default:
+        break
+    }
 }
 ```
+
+The stream ends without `.completed` when the consumer stops iterating or its task is cancelled, and in-flight requests are cancelled with it.
 
 #### Musixmatch source requires a token
 
@@ -96,49 +100,58 @@ LiricoKit is derived from LyricsKit (part of LyricsX) and licensed under MPL 2.0
                       | <lyric attachment>
                       | ""
 
-<id tag>            ::= <tag>
-<tag>               ::= "[" <tag content> "]"
-<tag content>       ::= <tag key>
-                      | <tag key> ":" <tag value>
-<tag key>           ::= [0-9a-zA-Z_-]+
-<tag value>         ::= <character except NEWLINE or "]">+
+<id tag>            ::= "[" <tag key> ":" <tag value> "]"
+<tag key>           ::= <character except NEWLINE or ":">+
+<tag value>         ::= <character except NEWLINE>+
 
-<lyric line>        ::= <time tag> <character except NEWLINE>*
-<lyric attachment>  ::= <time tag> <attachment tag> <attachment body>
+<lyric line>        ::= <time tag>+ <lyrics text> <inline translation>?
+<lyric attachment>  ::= <time tag>+ "[" <attachment tag> "]" <attachment body>
 
-<time tag>          ::= "[" (<minute> ":")* <second> ("." <millisecond>)* "]"
+<time tag>          ::= "[" ("+" | "-")? <minutes> ":" <seconds> ("." <fraction>)? "]"
+<minutes>           ::= <digit>+
+<seconds>           ::= <digit>+
+<fraction>          ::= <digit>+
 
-<attachment tag>            ::= <tag>
+<lyrics text>       ::= <character except NEWLINE>*
+<inline translation>::= "【" <character except NEWLINE or "【">* "】"
+
+<attachment tag>            ::= <character except NEWLINE or "]">+
 <attachment body>           ::= <plain text attachment>
                               | <index based attachment>
                               | <range based attachment>
-<plain text attachment>     ::= <character except NEWLINE>+
-<index based attachment>    ::= <index based segment>+
+<plain text attachment>     ::= <character except NEWLINE>*
+<index based attachment>    ::= <index based segment>+ <duration segment>?
 <range based attachment>    ::= <range based segment>+
-<index based segment>       ::= "<" <segment value> "," <segment index> ">"
-<range based segment>       ::= "<" <segment value> "," <segment range> ">"
-<segment value>             ::= <characters except NEWLINE, "," or ">">
-<segment index>             ::= <number>
-<segment range>             ::= <lowerBound> "," <upperBound>
+<index based segment>       ::= "<" <milliseconds> "," <character index> ">"
+<duration segment>          ::= "<" <milliseconds> ">"
+<range based segment>       ::= "<" <segment value> "," <lower bound> "," <upper bound> ">"
+<segment value>             ::= <character except NEWLINE, "," or ">">+
 ```
+
+- A line with several time tags is repeated at each time.
+- An attachment applies to the lyric line with the same time tag, and is written after it. An attachment-shaped line with no lyric line at its time is read as a lyric line whose text starts with `[`.
+- An attachment tag can't itself be a time tag.
+- `<inline translation>` is the legacy translation format. It is only read as a translation when it ends the line and follows some lyrics text; otherwise it is part of the text.
 
 ### Predefined tags
 
 Predefined ID tags:
 
-| Tag | Key | Value Type | Description |
-| --- | --- | --- | --- |
-| title | ti | string | |
-| album | al | string | |
-| artist | ar | string | |
-| offset | offset | integer | |
-| length | length | decimal | |
+| Tag | Key | Value |
+| --- | --- | --- |
+| title | ti | string |
+| album | al | string |
+| artist | ar | string |
+| author | au | string |
+| lyrics by | by | string |
+| offset | offset | integer, milliseconds |
+| length | length | seconds, or `minutes:seconds` |
 
-Predefind attachment tags:
+Predefined attachment tags:
 
-| Tag | Key | Value Type | Attachment type | Description |
-| --- | --- | --- | --- | --- |
-| translation | tr | [RFC 4646](https://www.ietf.org/rfc/rfc4646.txt) | plain text | |
-| word time tag | tt | no value | index based (with timestamp in millisecond) | |
-| furigana | fu | no value | range based | |
-| romaji | ro | no value | range based | |
+| Tag | Key | Body |
+| --- | --- | --- |
+| translation | `tr`, or `tr:<language>` with an [RFC 4646](https://www.ietf.org/rfc/rfc4646.txt) code | plain text |
+| word time tag | tt | index based: milliseconds from the line's start, at each character index |
+| furigana | fu | range based |
+| romaji | ro | range based |
