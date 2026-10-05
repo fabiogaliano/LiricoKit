@@ -222,19 +222,37 @@ struct GroupProviderEventTests {
         #expect(completed.isEmpty, "completed must not appear after stream cancellation")
     }
 
-    // MARK: lyrics(for:) compatibility
+    // MARK: Providers without descriptors
 
-    @Test func lyricsForRequestStillReturnsAllCandidates() async throws {
+    @Test func candidatesArriveFromEveryProvider() async {
         let providerA = StaticProvider(lyricsToYield: [makeLyrics(title: "A1"), makeLyrics(title: "A2")])
         let providerB = StaticProvider(lyricsToYield: [makeLyrics(title: "B1")])
-        let group = LyricsProviders.Group(descriptors: [
-            LyricsProviders.ProviderDescriptor(source: "A", provider: providerA),
-            LyricsProviders.ProviderDescriptor(source: "B", provider: providerB),
-        ])
+        let group = LyricsProviders.Group(providers: [providerA, providerB])
 
-        let lyrics = try await collect(group.lyrics(for: request))
-        let titles = Set(lyrics.compactMap { $0.idTags[.title] })
+        let events = await collect(group.events(for: request))
+
+        var titles: Set<String> = []
+        var sources: Set<String> = []
+        for case .candidate(let source, let lyrics) in events {
+            sources.insert(source)
+            if let title = lyrics.idTags[.title] {
+                titles.insert(title)
+            }
+        }
         #expect(titles == ["A1", "A2", "B1"])
+        #expect(sources == ["Provider0", "Provider1"])
+    }
+
+    @Test func groupWithoutProvidersOnlyCompletes() async {
+        let group = LyricsProviders.Group(providers: [])
+
+        let events = await collect(group.events(for: request))
+
+        #expect(events.count == 1)
+        guard case .completed = events.first else {
+            Issue.record("Expected only .completed, got \(events)")
+            return
+        }
     }
 
     // MARK: Plugin-derived searches

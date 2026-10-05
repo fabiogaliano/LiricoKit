@@ -23,6 +23,11 @@ Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music 
 - <del>Xiami Music</del> (discontinued)
 - <del>ViewLyrics</del> (not working anymore)
 
+## What's New (unreleased)
+
+- **Breaking:** removed the `LyricsServiceUI` module, `Lyrics.quality`, `Lyrics.isMatched()`, `Lyrics.generateFurigana()` and `LyricsProviders.Group.lyrics(for:)`. `Group` is no longer a `LyricsProvider`; search several sources with `Group.events(for:)`.
+- Parsing, cancellation, timeout and error-reporting fixes; see the [changelog](CHANGELOG.md).
+
 ## What's New in 2.0.0
 
 - Renamed from LyricsKit to LiricoKit: the package, `LiricoKit` product/module, and `LiricoKitAppleMusic` product. Replace `import LyricsKit` with `import LiricoKit`; `LyricsCore`, `LyricsService`, and `LyricsServiceUI` are unchanged.

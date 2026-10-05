@@ -1,10 +1,8 @@
 import Foundation
 import LyricsCore
-import FoundationToolbox
 
 extension LyricsProviders {
-    @Loggable
-    public final class Group: LyricsProvider {
+    public final class Group: Sendable {
         public let providers: [LyricsProvider]
 
         /// Plugins run upstream of `providers`: they widen a search by
@@ -27,8 +25,6 @@ extension LyricsProviders {
 
         /// Descriptor-based initialiser.  Use this path when you need
         /// `events(for:)` to echo canonical source names in its payloads.
-        /// The `providers` property is populated from the descriptors so all
-        /// existing callers that only rely on `lyrics(for:)` keep working.
         public init(
             descriptors: [ProviderDescriptor],
             plugins: [LyricsSearchRequestPlugin] = []
@@ -36,56 +32,6 @@ extension LyricsProviders {
             self.descriptors = descriptors
             self.providers = descriptors.map(\.provider)
             self.plugins = plugins
-        }
-
-        public func lyrics(for request: LyricsSearchRequest) -> AsyncThrowingStream<Lyrics, Error> {
-            AsyncThrowingStream { continuation in
-                let task = Task {
-                    await withTaskGroup(of: Void.self) { taskGroup in
-                        // Search the original request immediately — plugin
-                        // resolution must never delay the direct providers.
-                        taskGroup.addTask {
-                            await self.search(request, into: continuation)
-                        }
-                        // Plugins widen the search; each extra request they
-                        // produce is searched as soon as it resolves.
-                        if !self.plugins.isEmpty {
-                            taskGroup.addTask {
-                                let extraRequests = await self.expand(request)
-                                await withTaskGroup(of: Void.self) { extraTaskGroup in
-                                    for extraRequest in extraRequests {
-                                        extraTaskGroup.addTask {
-                                            await self.search(extraRequest, into: continuation)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    continuation.finish()
-                }
-                continuation.onTermination = { _ in task.cancel() }
-            }
-        }
-
-        /// Run every provider for `request`, forwarding their lyrics downstream.
-        private func search(
-            _ request: LyricsSearchRequest,
-            into continuation: AsyncThrowingStream<Lyrics, Error>.Continuation
-        ) async {
-            await withTaskGroup(of: Void.self) { taskGroup in
-                for provider in providers {
-                    taskGroup.addTask {
-                        do {
-                            for try await lyric in provider.lyrics(for: request) {
-                                continuation.yield(lyric)
-                            }
-                        } catch {
-                            #log(.error, "A provider in the group failed: \(error)")
-                        }
-                    }
-                }
-            }
         }
 
         /// Ask every plugin for extra requests to search, discarding any

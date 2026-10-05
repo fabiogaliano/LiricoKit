@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **breaking:** remove the `LyricsServiceUI` module (source icon drawing); `LiricoKit` no longer re-exports it
+- **breaking:** remove `Lyrics.quality`, `Lyrics.isMatched()` and `Lyrics.generateFurigana()`
+- **breaking:** remove `LyricsProviders.Group.lyrics(for:)`; `Group` no longer conforms to `LyricsProvider` (it is still `Sendable`). Use `events(for:)`
+- **breaking:** `LyricsProviderError` has a new `httpError(statusCode:)` case, so exhaustive switches over it need updating
+- drop the SwiftCF dependency, which only furigana generation used
 - fix word-timed lyrics (QQ Music QRC, NetEase YRC and klyric, Kugou KRC) dropping text that contains `(` or `<`, e.g. "said (oh yeah)"
 - fix a crash on Kugou KRC payloads shorter than three bytes
 - fix `Lyrics(_:)` losing text when reloading saved lyrics: lines like `【副歌】我爱你` or `【間奏】` no longer load as a translation, lines starting with `[` such as `[Chorus] la la` are no longer dropped as attachments, and lines with several time tags are no longer duplicated on each save
