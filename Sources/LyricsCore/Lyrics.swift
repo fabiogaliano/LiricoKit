@@ -29,7 +29,7 @@ public final class Lyrics: LosslessStringConvertible {
             let timeTagStr = match[1]!.string
             let timeTags = resolveTimeTag(timeTagStr)
 
-            let lyricsContentStr = match[2]!.string
+            let lyricsContentStr = (match[2] ?? match[4])!.string
             var line = LyricsLine(content: lyricsContentStr, position: 0)
 
             if let translationStr = match[3]?.string, !translationStr.isEmpty {
@@ -59,11 +59,18 @@ public final class Lyrics: LosslessStringConvertible {
             let attachmentStr = match[3]?.string ?? ""
 
             for timeTag in timeTags {
-                if case .found(at: let index) = lineIndex(of: timeTag) {
+                switch lineIndex(of: timeTag) {
+                case .found(at: let index):
                     self.lines[index].attachments[.init(attachmentTagStr)] = attachmentStr
+                    tags.insert(.init(attachmentTagStr))
+                case .notFound(insertAt: let index):
+                    // `description` writes every line before its attachments, so an
+                    // attachment with no line at its time is a line whose text starts with "[".
+                    var line = LyricsLine(content: "[\(attachmentTagStr)]\(attachmentStr)", position: timeTag)
+                    line.lyrics = self
+                    self.lines.insert(line, at: index)
                 }
             }
-            tags.insert(.init(attachmentTagStr))
         }
         metadata.data[.attachmentTags] = tags
     }

@@ -15,11 +15,15 @@ func resolveTimeTag(_ str: String) -> [TimeInterval] {
 
 let id3TagRegex = try! Regex(#"^(?!\[[+-]?\d+:\d+(?:\.\d+)?\])\[(.+?):(.+)\]$"#, options: .anchorsMatchLines)
 
-let lyricsLineRegex = try! Regex(#"^((?:\[[+-]?\d+:\d+(?:\.\d+)?\])+)(?!\[)([^【\n\r]*)(?:【(.*)】)?"#, options: .anchorsMatchLines)
+// Legacy files put a translation in a trailing `【…】` after the lyrics. Brackets
+// anywhere else, or with no lyrics before them, are part of the lyrics.
+// Groups: 1 time tags, 2 lyrics before a translation, 3 translation, 4 lyrics without one.
+let lyricsLineRegex = Regex(#"^((?:\[[+-]?\d+:\d+(?:\.\d+)?\])+)(?!\[)(?:([^\n\r]+?)【([^【\n\r]*)】[^\S\n\r]*|([^\n\r]*))(?=[\n\r]|\z)"#, options: .anchorsMatchLines)
 
 let base60TimeRegex = try! Regex(#"^\s*(?:(\d+):)?(\d+(?:.\d+)?)\s*$"#)
 
-let lyricsLineAttachmentRegex = try! Regex(#"^(\[[+-]?\d+:\d+(?:\.\d+)?\])+\[(.+?)\](.*)"#, options: .anchorsMatchLines)
+// A second time tag is a repeated line, not an attachment tag.
+let lyricsLineAttachmentRegex = Regex(#"^((?:\[[+-]?\d+:\d+(?:\.\d+)?\])+)\[(?![+-]?\d+:\d+(?:\.\d+)?\])(.+?)\](.*)"#, options: .anchorsMatchLines)
 
 let timeLineAttachmentRegex = try! Regex(#"<(\d+,\d+)>"#)
 
