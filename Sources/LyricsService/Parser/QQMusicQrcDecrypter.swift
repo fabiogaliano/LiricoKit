@@ -72,30 +72,6 @@ extension Array where Element == UInt8 {
     }
 }
 
-private func toBoolean(_ val: String) -> Bool? {
-    if val.isEmpty { return nil }
-    return val == "true" || val == "1"
-}
-
-private func getPageSize(total: Int, size: Int, currentTotal: Int? = nil, maxTotal: Int? = nil) -> Int {
-    var adjustedTotal = total
-    if let maxTotal = maxTotal, total > maxTotal {
-        adjustedTotal = maxTotal
-    }
-
-    if let currentTotal = currentTotal, size - currentTotal > 10 {
-        return 1
-    } else {
-        let remainder = adjustedTotal % size
-        let num = adjustedTotal / size
-        return remainder != 0 ? num + 1 : num
-    }
-}
-
-private func toParamsString(_ params: [String: Any]?) -> String {
-    return params?.map { "\($0.key)=\($0.value)" }.joined(separator: "&") ?? ""
-}
-
 func lyricFormat(_ lyric: String) -> String {
     return lyric
         .replacingOccurrences(of: "&#10;", with: "\n")
@@ -110,76 +86,6 @@ func lyricFormat(_ lyric: String) -> String {
         .replacingOccurrences(of: "&#64;", with: "@")
         .replacingOccurrences(of: "&#95;", with: "_")
         .replacingOccurrences(of: "&#124;", with: "|")
-}
-
-private func paramsToMap(_ params: String) -> [String: String] {
-    var map: [String: String] = [:]
-
-    for element in params.components(separatedBy: "&") {
-        let entity = element.components(separatedBy: "=")
-        if entity.count > 1 {
-            map[entity[0]] = entity[1]
-        } else {
-            map[entity[0]] = ""
-        }
-    }
-
-    return map
-}
-
-private func splitList<T>(_ list: [T], _ len: Int) -> [[T]] {
-    return stride(from: 0, to: list.count, by: len).map {
-        Array(list[$0 ..< min($0 + len, list.count)])
-    }
-}
-
-private func getRandom(_ length: Int) -> String {
-    let ch = "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz"
-    return String((0 ..< length).map { _ in ch.randomElement()! })
-}
-
-extension String {
-    fileprivate var uint8List: [UInt8] {
-        return Array(utf8)
-    }
-
-    fileprivate var hexToUint8List: [UInt8] {
-        let hexStr = uppercased()
-        var bytes = [UInt8]()
-        for i in stride(from: 0, to: hexStr.count, by: 2) {
-            let index = hexStr.index(hexStr.startIndex, offsetBy: i)
-            let byteString = hexStr[index...].prefix(2)
-            if let num = UInt8(byteString, radix: 16) {
-                bytes.append(num)
-            }
-        }
-        return bytes
-    }
-}
-
-extension Array where Element == UInt8 {
-    fileprivate var hex: String {
-        return map { String(format: "%02X", $0) }.joined()
-    }
-
-    fileprivate var str: String? {
-        return String(bytes: self, encoding: .utf8)
-    }
-}
-
-private func restoreQrc(_ hexText: String) -> [UInt8]? {
-    guard hexText.count % 2 == 0 else { return nil }
-
-    var bytes = [UInt8]()
-    for i in stride(from: 0, to: hexText.count, by: 2) {
-        let index = hexText.index(hexText.startIndex, offsetBy: i)
-        let byteString = hexText[index...].prefix(2)
-        if let num = UInt8(byteString, radix: 16) {
-            bytes.append(num)
-        }
-    }
-
-    return bytes
 }
 
 private class QrcDecodeHelper {

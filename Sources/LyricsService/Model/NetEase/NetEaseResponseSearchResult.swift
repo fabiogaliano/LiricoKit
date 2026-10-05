@@ -95,23 +95,3 @@ struct NetEaseResponseModelAlbum: Decodable {
     // let songs: [Any]
     // let alias: [Any]
 }
-
-struct NetEaseResponseModelMusic: Decodable {
-    // let id: Int
-    // let size: Int
-    // let `extension`: String
-    // let sr: Int
-    // let dfsId: Int
-    // let bitrate: Int
-    // let playTime: Int
-    // let volumeDelta: Double
-    // 
-
-    // let name: Any?
-}
-
-extension NetEaseResponseSearchResult {
-    var songs: [Result.Song] {
-        return result.songs
-    }
-}

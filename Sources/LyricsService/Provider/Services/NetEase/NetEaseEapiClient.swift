@@ -114,16 +114,6 @@ struct NetEaseEapiClient: Sendable {
         }
     }
 
-    static func aesDecryptECB(data: Data, key: Data) throws -> Data {
-        do {
-            let aes = try AES(key: Array(key), blockMode: ECB(), padding: .pkcs7)
-            let decrypted = try aes.decrypt(Array(data))
-            return Data(decrypted)
-        } catch {
-            throw LyricsProviderError.processingFailed(reason: "AES ECB decryption failed: \(error.localizedDescription)")
-        }
-    }
-
     static func md5Hash(_ string: String) -> String {
         guard let data = string.data(using: .utf8) else { return "" }
         return Array(data).md5().map { String(format: "%02x", $0) }.joined()

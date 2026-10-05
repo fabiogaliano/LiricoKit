@@ -11,13 +11,11 @@ struct NetEaseEapiClientTests {
         #expect(NetEaseEapiClient.md5Hash("message digest") == "f96b697d7cb7938d525a2f31aaf161d0")
     }
 
-    @Test func aesEncryptDecryptRoundTrip() throws {
-        let key = NetEaseEapiClient.eapiKey
-        let plaintext = Data("Hello, eapi world!".utf8)
-        let encrypted = try NetEaseEapiClient.aesEncryptECB(data: plaintext, key: key)
-        #expect(encrypted != plaintext)
-        let decrypted = try NetEaseEapiClient.aesDecryptECB(data: encrypted, key: key)
-        #expect(decrypted == plaintext)
+    @Test func aesEncryptMatchesOpenSSL() throws {
+        // `openssl enc -aes-128-ecb` with the eapi key, PKCS#7 padding.
+        let encrypted = try NetEaseEapiClient.aesEncryptECB(data: Data("Hello, eapi world!".utf8), key: NetEaseEapiClient.eapiKey)
+        let hex = encrypted.map { String(format: "%02X", $0) }.joined()
+        #expect(hex == "0392E41FB19DB7B9D70F8357FF991910081F6F0133BACA84DF2E6AAF31E453D9")
     }
 
     @Test func aesEncryptIsDeterministicForSameInput() throws {

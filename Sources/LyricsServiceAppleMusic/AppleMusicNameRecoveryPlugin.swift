@@ -6,7 +6,7 @@ import MusicKit
 /// Route B — a lyrics-search *plugin*, not a lyrics source.
 ///
 /// Apple Music localizes a track's title/artist by storefront, so the
-/// now-playing name LyricsX sees can be a romanization or English
+/// now-playing name the app sees can be a romanization or English
 /// translation (issue #17: 「雨のメヌエット」→「Ame No Minuet」). Searching the
 /// third-party providers with that mismatched name then fails.
 ///
@@ -29,7 +29,7 @@ import MusicKit
 @available(macOS 12.0, *)
 public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
 
-    /// `userInfo` flag (`"1"`) set by LyricsX when the now-playing track is
+    /// `userInfo` flag (`"1"`) set by the app when the now-playing track is
     /// from Apple Music. Route B only runs for those tracks.
     public static let appleMusicTrackUserInfoKey = "appleMusicNowPlaying"
 
@@ -75,7 +75,7 @@ public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
     // MARK: - Recovery pipeline
 
     /// now-playing track -> ISRC -> native-script `(title, artist)` variants
-    /// that differ from the name LyricsX already searched with.
+    /// that differ from the name the app already searched with.
     private func recoverNativeNames(
         for request: LyricsSearchRequest
     ) async throws -> [RecoveredName] {
@@ -89,7 +89,7 @@ public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
         }
 
         // The user's own storefront is *not* excluded: the now-playing name
-        // LyricsX sees is localized by the Apple Music app's display language
+        // the app sees is localized by the Apple Music app's display language
         // (the system language), whereas a direct catalog query returns the
         // storefront's own language — so even the user's storefront yields a
         // name worth recovering. Excluding it also emptied the target list
@@ -157,7 +157,7 @@ public struct AppleMusicNameRecoveryPlugin: LyricsSearchRequestPlugin {
     }
 
     /// Keep distinct `(title, artist)` variants that differ from what
-    /// LyricsX already searched — re-searching an identical name is wasted
+    /// the app already searched — re-searching an identical name is wasted
     /// work. The pair is compared because a track's title is often stable
     /// across storefronts while the artist is romanized/transliterated
     /// (晴天 stays 晴天, but 周杰伦 -> 周杰倫 / Jay Chou / 주걸륜).
