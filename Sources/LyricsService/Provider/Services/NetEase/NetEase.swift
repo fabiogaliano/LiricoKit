@@ -1,6 +1,7 @@
 import Foundation
 import LyricsCore
 import Regex
+import Synchronization
 
 extension LyricsProviders {
     final class NetEase {
@@ -8,7 +9,7 @@ extension LyricsProviders {
         private let eapiClient: NetEaseEapiClient
         /// The search API rejects cookieless requests (code -462), and the cookie it hands out
         /// lives for years, so it is harvested once instead of costing a round trip per search.
-        private let searchCookie = SearchCookie()
+        private let searchCookie = Mutex<String?>(nil)
         private var performer: NetworkPerformer { NetworkPerformer(httpClient: httpClient) }
 
         private static let lyricsEapiURL = "https://interface3.music.163.com/eapi/song/lyric/v1"
@@ -47,14 +48,14 @@ extension LyricsProviders.NetEase: _LyricsProvider {
 
         var searchRequest = try endpoint.buildRequest()
 
-        if let cookie = searchCookie.value {
+        if let cookie = searchCookie.withLock({ $0 }) {
             searchRequest.setValue(cookie, forHTTPHeaderField: "Cookie")
             if let data = try? await performer.executeReturningData(searchRequest),
                let searchResult = try? performer.decode(data, as: NetEaseResponseSearchResult.self) {
                 return searchResult.result.songs.map(LyricsToken.init)
             }
             // A rejected or expired cookie: fall through and harvest a fresh one.
-            searchCookie.value = nil
+            searchCookie.withLock { $0 = nil }
             searchRequest.setValue(nil, forHTTPHeaderField: "Cookie")
         }
 
@@ -65,7 +66,7 @@ extension LyricsProviders.NetEase: _LyricsProvider {
            let cookieIdx = setCookie.firstIndex(of: ";") {
             let cookie = String(setCookie[..<cookieIdx])
             searchRequest.setValue(cookie, forHTTPHeaderField: "Cookie")
-            searchCookie.value = cookie
+            searchCookie.withLock { $0 = cookie }
         }
 
         // Second pass with cookie.
@@ -118,20 +119,6 @@ extension LyricsProviders.NetEase: _LyricsProvider {
         return lyrics
     }
 }
-
-extension LyricsProviders.NetEase {
-    final class SearchCookie: @unchecked Sendable {
-        private let lock = NSLock()
-        private var cookie: String?
-
-        var value: String? {
-            get { lock.withLock { cookie } }
-            set { lock.withLock { cookie = newValue } }
-        }
-    }
-}
-
-private let netEaseTimeTagFixer = Regex(#"(\[\d+:\d+):(\d+\])"#)
 
 extension NetEaseResponseSingleLyrics.Lyric {
     fileprivate var fixedLyric: String? {

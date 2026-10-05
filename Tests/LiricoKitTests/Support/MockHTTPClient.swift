@@ -1,7 +1,8 @@
 import Foundation
+import Synchronization
 @testable import LyricsService
 
-final class MockHTTPClient: HTTPClient, @unchecked Sendable {
+final class MockHTTPClient: HTTPClient {
     enum StubResponse {
         case data(Data, statusCode: Int = 200, headers: [String: String] = [:])
         case error(Error)
@@ -12,29 +13,23 @@ final class MockHTTPClient: HTTPClient, @unchecked Sendable {
         let response: StubResponse
     }
 
-    private let lock = NSLock()
-    private var stubs: [Stub] = []
-    private var _recorded: [URLRequest] = []
-
-    private func synchronized<T>(_ body: () -> T) -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return body()
+    private struct State {
+        var stubs: [Stub] = []
+        var recorded: [URLRequest] = []
     }
 
+    private let state = Mutex(State())
+
     var recorded: [URLRequest] {
-        synchronized { _recorded }
+        state.withLock { $0.recorded }
     }
 
     func reset() {
-        synchronized {
-            stubs.removeAll()
-            _recorded.removeAll()
-        }
+        state.withLock { $0 = State() }
     }
 
     func stub(matching: @escaping @Sendable (URLRequest) -> Bool, response: StubResponse) {
-        synchronized { stubs.append(Stub(matches: matching, response: response)) }
+        state.withLock { $0.stubs.append(Stub(matches: matching, response: response)) }
     }
 
     func stub(path: String, response: StubResponse) {
@@ -54,9 +49,9 @@ final class MockHTTPClient: HTTPClient, @unchecked Sendable {
     }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let stub: Stub? = synchronized {
-            _recorded.append(request)
-            return stubs.first(where: { $0.matches(request) })
+        let stub = state.withLock { state in
+            state.recorded.append(request)
+            return state.stubs.first { $0.matches(request) }
         }
         guard let stub else {
             let path = request.url?.path ?? "<no url>"

@@ -1,6 +1,6 @@
 import Foundation
 
-protocol QQMusicSongSearchResult {
+protocol QQMusicSongSearchResult: Sendable {
     var id: String { get }
     var mid: String { get }
     var name: String { get }

@@ -1,5 +1,7 @@
 import Foundation
-import Regex
+// Regex predates Sendable; its patterns are immutable NSRegularExpressions,
+// which are safe to share.
+@preconcurrency import Regex
 
 let id3TagRegex = Regex(#"^(?!\[[+-]?\d+:\d+(?:\.\d+)?\])\[(.+?):(.+)\]$"#, options: .anchorsMatchLines)
 
@@ -16,3 +18,5 @@ let netEaseInlineTagRegex = Regex(#"\(0,(\d+)\)((?:(?!\(0,\d+\)).)+)(\(0,1\) )?"
 let kugouInlineTagRegex = Regex(#"<(\d+),(\d+),0>((?:(?!<\d+,\d+,0>).)*)"#)
 
 let qqmusicInlineTagRegex = Regex(#"((?:(?!\(\d+,\d+\)).)*)\((\d+),(\d+)\)"#)
+
+let netEaseTimeTagFixer = Regex(#"(\[\d+:\d+):(\d+\])"#)

@@ -9,7 +9,7 @@ public protocol LyricsProvider: Sendable {
 }
 
 protocol _LyricsProvider: LyricsProvider {
-    associatedtype LyricsToken
+    associatedtype LyricsToken: Sendable
 
     static var service: String { get }
 

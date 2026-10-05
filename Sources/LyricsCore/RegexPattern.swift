@@ -1,5 +1,7 @@
 import Foundation
-import Regex
+// Regex predates Sendable; its patterns are immutable NSRegularExpressions,
+// which are safe to share.
+@preconcurrency import Regex
 
 private let timeTagRegex = Regex(#"\[([-+]?\d+):(\d+(?:\.\d+)?)\]"#)
 

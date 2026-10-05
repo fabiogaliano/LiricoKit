@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-@preconcurrency import LyricsCore
 @testable import LyricsService
 
 /// A provider whose fetches take a set time and report how they ended.

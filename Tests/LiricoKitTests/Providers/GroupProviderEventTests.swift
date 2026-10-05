@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-@preconcurrency import LyricsCore
 @testable import LyricsService
 
 // MARK: - Helpers shared within this file
@@ -193,18 +192,16 @@ struct GroupProviderEventTests {
 
     @Test func cancellingStreamDoesNotEmitCompleted() async {
         // Use a gated provider so the task is still running when we cancel.
-        var gateContinuation: AsyncStream<Void>.Continuation?
-        let gate = AsyncStream<Void> { gateContinuation = $0 }
+        let (gate, gateContinuation) = AsyncStream.makeStream(of: Void.self)
 
         let gated = GatedProvider(title: "Gated", gate: gate)
         let group = LyricsProviders.Group(descriptors: [
             LyricsProviders.ProviderDescriptor(source: "Gated", provider: gated),
         ])
 
-        var collectedEvents: [LyricsProviders.ProviderEvent] = []
-
         // Wrap the iteration in a task we can cancel externally.
         let consumerTask = Task {
+            var collectedEvents: [LyricsProviders.ProviderEvent] = []
             for await event in group.events(for: request) {
                 collectedEvents.append(event)
                 // After receiving providerStarted, cancel immediately without
@@ -213,10 +210,11 @@ struct GroupProviderEventTests {
                     break
                 }
             }
+            return collectedEvents
         }
 
-        await consumerTask.value
-        gateContinuation?.finish()
+        let collectedEvents = await consumerTask.value
+        gateContinuation.finish()
 
         let completed = collectedEvents.filter { if case .completed = $0 { return true }; return false }
         #expect(completed.isEmpty, "completed must not appear after stream cancellation")
