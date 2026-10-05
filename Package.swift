@@ -3,19 +3,19 @@
 import PackageDescription
 
 let package = Package(
-    name: "LyricsKit",
+    name: "LiricoKit",
     platforms: [
         .macOS(.v10_15),
     ],
     products: [
         .library(
-            name: "LyricsKit",
-            targets: ["LyricsKit"]
+            name: "LiricoKit",
+            targets: ["LiricoKit"]
         ),
         // Apple Music support is a separate product so widget/extension
         // targets are never forced to link WebKit.
         .library(
-            name: "LyricsKitAppleMusic",
+            name: "LiricoKitAppleMusic",
             targets: ["LyricsServiceAppleMusic"]
         ),
     ],
@@ -29,7 +29,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "LyricsKit",
+            name: "LiricoKit",
             dependencies: [
                 "LyricsCore",
                 "LyricsService",
@@ -69,7 +69,7 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "LyricsKitTests",
+            name: "LiricoKitTests",
             dependencies: [
                 "LyricsCore",
                 "LyricsService",

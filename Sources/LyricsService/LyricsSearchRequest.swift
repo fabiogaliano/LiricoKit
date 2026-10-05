@@ -65,7 +65,7 @@ public struct LyricsSearchRequest: Equatable, Sendable, Identifiable {
 }
 
 extension LyricsSearchRequest {
-    /// Typed keys for `userInfo` entries defined by LyricsKit itself.
+    /// Typed keys for `userInfo` entries defined by LiricoKit itself.
     public enum UserInfoKey {
         /// Key for the album name passed in as supplementary search metadata.
         public static let albumName = "albumName"

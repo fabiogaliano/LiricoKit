@@ -17,7 +17,7 @@ private let searchReq = LyricsSearchRequest(
     duration: duration
 )
 
-struct LyricsKitIntegrationTests {
+struct LiricoKitIntegrationTests {
     private func run(provider: LyricsProvider) async throws {
         guard integrationEnabled else { return }
         for try await lyrics in provider.lyrics(for: searchReq) {

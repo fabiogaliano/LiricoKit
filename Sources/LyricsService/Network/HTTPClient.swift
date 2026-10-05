@@ -5,7 +5,7 @@ import FoundationNetworking
 
 /// A pluggable HTTP transport used by `LyricsProvider` implementations.
 ///
-/// LyricsKit ships `URLSessionHTTPClient` as the production default
+/// LiricoKit ships `URLSessionHTTPClient` as the production default
 /// (via `HTTPClient.shared`). Tests can supply an in-memory implementation
 /// to stub responses without hitting the network.
 public protocol HTTPClient: Sendable {

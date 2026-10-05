@@ -28,7 +28,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild test \
-            -scheme LyricsKit \
+            -scheme LiricoKit \
             -destination "platform=iOS Simulator,name=iPhone 12" | xcpretty
 
   linux:

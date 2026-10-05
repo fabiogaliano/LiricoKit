@@ -1,6 +1,14 @@
-# LyricsKit
+# LiricoKit
 
-Lyrics submodule for [LyricsX](https://github.com/ddddxxx/LyricsX).
+Lyrics search and parsing engine for [Lirico](https://github.com/fabiogaliano/Lirico). Forked from [LyricsKit](https://github.com/MxIris-LyricsX-Project/LyricsKit), the lyrics submodule of [LyricsX](https://github.com/ddddxxx/LyricsX).
+
+## Installation
+
+```swift
+.package(url: "https://github.com/fabiogaliano/LiricoKit", from: "2.0.0")
+```
+
+Products: `LiricoKit` (core + providers) and `LiricoKitAppleMusic` (Apple Music support, links WebKit).
 
 ## Supported Sources
 
@@ -15,6 +23,10 @@ Lyrics submodule for [LyricsX](https://github.com/ddddxxx/LyricsX).
 - <del>Syair</del>
 - <del>Xiami Music</del> (discontinued)
 - <del>ViewLyrics</del> (not working anymore)
+
+## What's New in 2.0.0
+
+- Renamed from LyricsKit to LiricoKit: the package, `LiricoKit` product/module, and `LiricoKitAppleMusic` product. Replace `import LyricsKit` with `import LiricoKit`; `LyricsCore`, `LyricsService`, and `LyricsServiceUI` are unchanged.
 
 ## What's New in 1.9.0
 
@@ -71,7 +83,7 @@ The method for retrieving lyrics from Musixmatch is adapted from [LyricsPlus](ht
 
 ## License
 
-LyricsKit is part of LyricsX and licensed under MPL 2.0. See the [LICENSE file](LICENSE).
+LiricoKit is derived from LyricsKit (part of LyricsX) and licensed under MPL 2.0. See the [LICENSE file](LICENSE).
 
 ## LRCX file
 

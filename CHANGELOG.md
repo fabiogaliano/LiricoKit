@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+- rename package LyricsKit → LiricoKit: products `LiricoKit` and `LiricoKitAppleMusic`, umbrella module `LiricoKit` (replace `import LyricsKit`); repository moved to `fabiogaliano/LiricoKit`
+
 ## 1.9.0
 
 - add `LyricsProviders.Group.events(for:)` for non-throwing provider lifecycle streaming
