@@ -92,12 +92,11 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
             queryItems: queryItems
         )
         let results: [LRCLIBResponse] = try await performer.performJSON(endpoint)
-        return results.map { LyricsToken(value: $0, fromExactLookup: false) }
+        return results.filter(\.hasSyncedLyrics).map { LyricsToken(value: $0, fromExactLookup: false) }
     }
 
-    /// Exact /api/get signature lookup — distinct from the per-id /api/get/{id} used
-    /// in fetch(with:). This one takes structured query params and returns a single
-    /// record (or 404). Only invoked for info+album+duration searches.
+    /// Exact /api/get signature lookup: takes structured query params and returns a
+    /// single record (or 404). Only invoked for info+album+duration searches.
     private func exactSignatureLookup(
         title: String,
         artist: String,
@@ -115,6 +114,7 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
             ]
         )
         let response: LRCLIBResponse = try await performer.performJSON(endpoint)
+        guard response.hasSyncedLyrics else { return nil }
         return LyricsToken(value: response, fromExactLookup: true)
     }
 
@@ -140,39 +140,30 @@ extension LyricsProviders.LRCLIB: _LyricsProvider {
         return result
     }
 
-    // MARK: – Fetch (per-id /api/get/{id})
+    // MARK: – Fetch
 
-    /// Fetches full lyrics for a token. If the token already carries syncedLyrics
-    /// (common for both exact and broad results) it parses inline without a network call.
-    /// Otherwise, falls back to the per-id /api/get/{id} endpoint — this is the existing
-    /// broad-path fetch, distinct from the exact-signature /api/get used in gatherTokens.
+    /// Search records already carry the full lyrics, so there is nothing left to download.
     func fetch(with token: LyricsToken) async throws -> Lyrics {
-        if let lyrics = parseLyrics(for: token.value) {
-            return lyrics
+        let record = token.value
+        guard let syncedLyrics = record.syncedLyrics, let lyrics = Lyrics(syncedLyrics) else {
+            throw LyricsProviderError.processingFailed(reason: "LRCLIB record \(record.id) has unparseable synced lyrics.")
         }
-
-        let endpoint = Endpoint(
-            host: "lrclib.net",
-            path: "/api/get/\(token.value.id)"
+        lyrics.applyMetadata(
+            title: record.trackName,
+            artist: record.artistName,
+            album: record.albumName,
+            length: Double(record.duration),
+            serviceToken: "\(record.id)"
         )
-        let fetchedToken: LRCLIBResponse = try await performer.performJSON(endpoint)
-
-        guard let lyrics = parseLyrics(for: fetchedToken) else {
-            throw LyricsProviderError.processingFailed(reason: "Synced lyrics not found in fetched LRCLIB response.")
-        }
         return lyrics
     }
+}
 
-    private func parseLyrics(for token: LRCLIBResponse) -> Lyrics? {
-        guard let syncedLyrics = token.syncedLyrics,
-              let lyrics = Lyrics(syncedLyrics) else { return nil }
-        lyrics.applyMetadata(
-            title: token.trackName,
-            artist: token.artistName,
-            album: token.albumName,
-            length: Double(token.duration),
-            serviceToken: "\(token.id)"
-        )
-        return lyrics
+extension LRCLIBResponse {
+    /// Records without synced lyrics are dropped at search time, before the request's
+    /// `limit` is applied, so they can't use up result slots. Refetching one by id
+    /// returns the same record, so it would never gain them.
+    fileprivate var hasSyncedLyrics: Bool {
+        syncedLyrics?.isEmpty == false
     }
 }

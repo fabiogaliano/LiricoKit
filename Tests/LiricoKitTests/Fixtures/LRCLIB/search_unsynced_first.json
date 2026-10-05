@@ -1,0 +1,57 @@
+[
+  {
+    "id": 101,
+    "name": "Test Song (Instrumental)",
+    "trackName": "Test Song (Instrumental)",
+    "artistName": "Test Artist",
+    "albumName": "Test Album",
+    "duration": 200.0,
+    "instrumental": true,
+    "plainLyrics": null,
+    "syncedLyrics": null
+  },
+  {
+    "id": 102,
+    "name": "Test Song",
+    "trackName": "Test Song",
+    "artistName": "Test Artist",
+    "albumName": "Test Album (Deluxe)",
+    "duration": 201.0,
+    "instrumental": false,
+    "plainLyrics": "first line\nsecond line",
+    "syncedLyrics": null
+  },
+  {
+    "id": 103,
+    "name": "Test Song",
+    "trackName": "Test Song",
+    "artistName": "Test Artist",
+    "albumName": "Test Album",
+    "duration": 200.0,
+    "instrumental": false,
+    "plainLyrics": "first line\nsecond line",
+    "syncedLyrics": "[00:12.30]first line\n[00:15.80]second line"
+  },
+  {
+    "id": 104,
+    "name": "Test Song",
+    "trackName": "Test Song",
+    "artistName": "Test Artist",
+    "albumName": "Test Album (Live)",
+    "duration": 214.0,
+    "instrumental": false,
+    "plainLyrics": "first line\nsecond line",
+    "syncedLyrics": "[00:13.10]first line\n[00:16.40]second line"
+  },
+  {
+    "id": 105,
+    "name": "Test Song",
+    "trackName": "Test Song",
+    "artistName": "Test Artist",
+    "albumName": "Singles",
+    "duration": 199.0,
+    "instrumental": false,
+    "plainLyrics": "first line\nsecond line",
+    "syncedLyrics": "[00:12.00]first line\n[00:15.50]second line"
+  }
+]

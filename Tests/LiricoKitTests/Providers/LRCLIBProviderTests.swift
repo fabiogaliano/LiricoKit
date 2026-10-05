@@ -57,8 +57,7 @@ struct LRCLIBProviderTests {
         let provider = LyricsProviders.LRCLIB(httpClient: mock)
 
         let lyrics = try await collect(provider.lyrics(for: infoRequest))
-        // 1st token has syncedLyrics, 2nd does not -> 1st yields, 2nd path triggers fetch
-        #expect(lyrics.count >= 1)
+        #expect(lyrics.count == 1)
         let first = lyrics.first!
         #expect(first.idTags[.title] == "Test Song")
         #expect(first.idTags[.artist] == "Test Artist")
@@ -66,18 +65,32 @@ struct LRCLIBProviderTests {
         #expect(first.metadata.serviceToken == "12345")
     }
 
-    @Test func fallsBackToFetchForTokenWithoutSyncedLyrics() async throws {
+    @Test func limitCountsOnlyRecordsWithSyncedLyrics() async throws {
         let mock = MockHTTPClient()
-        mock.stub(path: "/api/search", response: .data(try FixtureLoader.data(named: "LRCLIB/search.json")))
-        mock.stub(matching: { $0.url?.path.hasPrefix("/api/get/") == true },
-                  response: .data(try FixtureLoader.data(named: "LRCLIB/get.json")))
+        mock.stub(path: "/api/search",
+                  response: .data(try FixtureLoader.data(named: "LRCLIB/search_unsynced_first.json")))
+        let provider = LyricsProviders.LRCLIB(httpClient: mock)
+        let request = LyricsSearchRequest(
+            searchTerm: .info(title: "Test Song", artist: "Test Artist"),
+            duration: 200,
+            limit: 2
+        )
+
+        let lyrics = try await collect(provider.lyrics(for: request))
+
+        #expect(Set(lyrics.compactMap(\.metadata.serviceToken)) == ["103", "104"])
+    }
+
+    /// Search records already carry the full lyrics, so refetching one by id can't add any.
+    @Test func neverRefetchesRecordsById() async throws {
+        let mock = MockHTTPClient()
+        mock.stub(path: "/api/search",
+                  response: .data(try FixtureLoader.data(named: "LRCLIB/search_unsynced_first.json")))
         let provider = LyricsProviders.LRCLIB(httpClient: mock)
 
         _ = try await collect(provider.lyrics(for: infoRequest))
 
-        let fetchRequest = mock.recorded.first(where: { $0.url?.path.hasPrefix("/api/get/") == true })
-        let fetchPath = try #require(fetchRequest?.url?.path)
-        #expect(fetchPath == "/api/get/67890")
+        #expect(mock.recorded.allSatisfy { $0.url?.path == "/api/search" })
     }
 
     @Test func networkErrorPropagatesAsNetworkError() async throws {
