@@ -27,13 +27,21 @@ struct NetworkPerformer: Sendable {
     }
 
     func execute(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let data: Data
+        let response: HTTPURLResponse
         do {
-            return try await httpClient.data(for: request)
+            (data, response) = try await httpClient.data(for: request)
         } catch let error as LyricsProviderError {
             throw error
         } catch {
             throw LyricsProviderError.networkError(underlyingError: error)
         }
+        // Error bodies (rate limits, outages, "not found" JSON) can still decode,
+        // which would make a failure look like an empty or bogus result.
+        guard (200 ..< 300).contains(response.statusCode) else {
+            throw LyricsProviderError.httpError(statusCode: response.statusCode)
+        }
+        return (data, response)
     }
 
     func decode<T: Decodable>(
