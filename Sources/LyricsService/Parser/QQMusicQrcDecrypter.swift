@@ -1001,38 +1001,39 @@ enum XMLUtils {
         return result
     }
 
-    /// 移除 XML 内容中无效的部分
-    private static func removeIllegalContent(_ content: String) -> String {
-        var modifiedContent = content
-        var i = 0
+    /// Removes attribute-only self-closing tags such as `<miniversion="1" />`,
+    /// which QQ Music responses contain and `XMLDocument` rejects.
+    static func removeIllegalContent(_ content: String) -> String {
+        var result: [Character] = []
+        result.reserveCapacity(content.utf8.count)
+        // Removing a tag can expose an earlier "<" as the start of the next candidate.
+        var openOffsets: [Int] = []
         var left = 0
 
-        while i < modifiedContent.count {
-            let index = modifiedContent.index(modifiedContent.startIndex, offsetBy: i)
-            if modifiedContent[index] == "<" {
-                left = i
-            }
-
-            if i > 0 && modifiedContent[index] == ">" && modifiedContent[modifiedContent.index(before: index)] == "/" {
-                let partStartIndex = modifiedContent.index(modifiedContent.startIndex, offsetBy: left)
-                let partEndIndex = modifiedContent.index(after: index)
-                let part = String(modifiedContent[partStartIndex ..< partEndIndex])
-
-                if part.contains("=") && part.firstIndex(of: "=") == part.lastIndex(of: "=") {
-                    let equalIndex = part.firstIndex(of: "=")!
-                    let part1 = part[..<equalIndex]
-                    if !part1.trimmingCharacters(in: .whitespaces).contains(" ") {
-                        modifiedContent.removeSubrange(partStartIndex ..< partEndIndex)
-                        i = 0
-                        continue
-                    }
+        for character in content {
+            let previous = result.last
+            result.append(character)
+            if character == "<" {
+                left = result.count - 1
+                openOffsets.append(left)
+            } else if character == ">", previous == "/", isIllegalTag(result[left...]) {
+                result.removeSubrange(left...)
+                while let last = openOffsets.last, last >= left {
+                    openOffsets.removeLast()
                 }
+                left = openOffsets.last ?? left
             }
-
-            i += 1
         }
 
-        return modifiedContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(result).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func isIllegalTag(_ tag: ArraySlice<Character>) -> Bool {
+        guard let equalsIndex = tag.firstIndex(of: "="), tag.lastIndex(of: "=") == equalsIndex else {
+            return false
+        }
+        let name = String(tag[..<equalsIndex]).trimmingCharacters(in: .whitespaces)
+        return !name.contains(" ")
     }
 }
 
