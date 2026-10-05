@@ -9,6 +9,9 @@ import Foundation
 private let integrationEnabled: Bool =
     ProcessInfo.processInfo.environment["INTEGRATION_TESTS"] == "1"
 
+private let musixmatchToken: String? =
+    ProcessInfo.processInfo.environment["MUSIXMATCH_TOKEN"].flatMap { $0.isEmpty ? nil : $0 }
+
 private let testSong = "Over"
 private let testArtist = "yihuik苡慧/白静晨"
 private let duration = 155.0
@@ -17,9 +20,9 @@ private let searchReq = LyricsSearchRequest(
     duration: duration
 )
 
+@Suite(.enabled(if: integrationEnabled, "Set INTEGRATION_TESTS=1 to run against the real providers"))
 struct LiricoKitIntegrationTests {
     private func run(provider: LyricsProvider) async throws {
-        guard integrationEnabled else { return }
         for try await lyrics in provider.lyrics(for: searchReq) {
             print(lyrics)
         }
@@ -41,13 +44,9 @@ struct LiricoKitIntegrationTests {
         try await run(provider: LyricsProviders.Service.netease.create())
     }
 
-    @Test func musixmatchProvider() async throws {
-        guard integrationEnabled else { return }
-        let token = ProcessInfo.processInfo.environment["MUSIXMATCH_TOKEN"]
-        guard let token, !token.isEmpty else {
-            print("Skipping MusixmatchProvider test: set MUSIXMATCH_TOKEN in env to enable")
-            return
-        }
+    @Test(.enabled(if: musixmatchToken != nil, "Set MUSIXMATCH_TOKEN to run against Musixmatch"))
+    func musixmatchProvider() async throws {
+        let token = try #require(musixmatchToken)
         let provider = LyricsProviders.Service.musixmatch.create(.init(usertoken: token))
         try await run(provider: provider)
     }
