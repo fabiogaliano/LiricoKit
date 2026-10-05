@@ -14,8 +14,25 @@ struct NetEaseEapiClientTests {
     @Test func aesEncryptMatchesOpenSSL() throws {
         // `openssl enc -aes-128-ecb` with the eapi key, PKCS#7 padding.
         let encrypted = try NetEaseEapiClient.aesEncryptECB(data: Data("Hello, eapi world!".utf8), key: NetEaseEapiClient.eapiKey)
-        let hex = encrypted.map { String(format: "%02X", $0) }.joined()
-        #expect(hex == "0392E41FB19DB7B9D70F8357FF991910081F6F0133BACA84DF2E6AAF31E453D9")
+        #expect(hexString(encrypted) == "0392E41FB19DB7B9D70F8357FF991910081F6F0133BACA84DF2E6AAF31E453D9")
+    }
+
+    @Test func aesEncryptPadsBlockAlignedInputWithAWholeBlock() throws {
+        // `openssl enc -aes-128-ecb` with the eapi key, PKCS#7 padding.
+        let encrypted = try NetEaseEapiClient.aesEncryptECB(data: Data("0123456789abcdef".utf8), key: NetEaseEapiClient.eapiKey)
+        #expect(hexString(encrypted) == "12AD99C476F307B9AFA42686D88FA74F6AA3B102FBE7296AB0DB9EA5C46AD12B")
+    }
+
+    @Test func aesEncryptOfEmptyInputIsOnePaddingBlock() throws {
+        // `openssl enc -aes-128-ecb` with the eapi key, PKCS#7 padding.
+        let encrypted = try NetEaseEapiClient.aesEncryptECB(data: Data(), key: NetEaseEapiClient.eapiKey)
+        #expect(hexString(encrypted) == "6AA3B102FBE7296AB0DB9EA5C46AD12B")
+    }
+
+    @Test func aesEncryptRejectsAKeyOfTheWrongSize() {
+        #expect(throws: LyricsProviderError.self) {
+            try NetEaseEapiClient.aesEncryptECB(data: Data("x".utf8), key: Data("short".utf8))
+        }
     }
 
     @Test func aesEncryptIsDeterministicForSameInput() throws {
@@ -39,6 +56,21 @@ struct NetEaseEapiClientTests {
         #expect(hex.count % 32 == 0)
     }
 
+    @Test func eApiParamsMatchesReferenceEncoding() throws {
+        // `md5` and `openssl enc -aes-128-ecb` over
+        // `/api/song/lyric/v1-36cd479b6b5-{"id":"12345"}-36cd479b6b5-<md5>`, where <md5> digests
+        // `nobody/api/song/lyric/v1use{"id":"12345"}md5forencrypt`.
+        let result = try NetEaseEapiClient.eApiParams(
+            url: "https://interface3.music.163.com/eapi/song/lyric/v1",
+            object: ["id": "12345"]
+        )
+        #expect(result == [
+            "params": "04AE33D34A93FE3EC22DA8FA305D290AB337D0FE5F36D211DE0D338CC6AA89D0"
+                + "242B1150EAD66640AC447793C004C8DC97DB035B47C04646B0430453EA881D52"
+                + "EE562FD80E3C439347440875E9587F0CBBF2286DD92731457D3A3479BB7DD229",
+        ])
+    }
+
     @Test func eApiParamsIsDeterministicForSameInput() throws {
         let url = "https://interface3.music.163.com/eapi/song/lyric/v1"
         let payload: [String: String] = ["id": "12345", "csrf_token": ""]
@@ -53,4 +85,8 @@ struct NetEaseEapiClientTests {
         #expect(normalized.contains("/eapi/"))
         #expect(!normalized.contains("/api/"))
     }
+}
+
+private func hexString(_ data: Data) -> String {
+    data.map { String(format: "%02X", $0) }.joined()
 }
