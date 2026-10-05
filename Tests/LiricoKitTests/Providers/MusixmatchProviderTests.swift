@@ -82,6 +82,21 @@ struct MusixmatchProviderTests {
         }
     }
 
+    @Test func http401ReportsAnInvalidToken() async throws {
+        let mock = MockHTTPClient()
+        mock.stub(path: "/ws/1.1/track.search",
+                  response: .data(try FixtureLoader.data(named: "Musixmatch/lyrics_invalid_token.json"), statusCode: 401))
+        let provider = LyricsProviders.Musixmatch(httpClient: mock)
+
+        let error = await #expect(throws: LyricsProviderError.self) {
+            _ = try await collect(provider.lyrics(for: infoRequest))
+        }
+        guard case .processingFailed(reason: "Invalid Musixmatch token") = error else {
+            Issue.record("Expected the invalid-token error, got \(String(describing: error))")
+            return
+        }
+    }
+
     @Test func networkErrorPropagates() async throws {
         let mock = MockHTTPClient()
         mock.stubAny(.error(URLError(.timedOut)))

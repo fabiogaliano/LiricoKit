@@ -77,7 +77,7 @@ extension LyricsProviders.Musixmatch: _LyricsProvider {
             headers: Self.headers
         )
 
-        let apiResponse: MusixmatchResponseSearchResult = try await performer.performJSON(endpoint)
+        let apiResponse: MusixmatchResponseSearchResult = try await performJSON(endpoint)
         try Self.checkTokenValidity(
             statusCode: apiResponse.message.header.statusCode,
             hint: apiResponse.message.header.hint
@@ -113,7 +113,7 @@ extension LyricsProviders.Musixmatch: _LyricsProvider {
             headers: Self.headers
         )
 
-        let apiResponse: MusixmatchResponseSingleLyrics = try await performer.performJSON(endpoint)
+        let apiResponse: MusixmatchResponseSingleLyrics = try await performJSON(endpoint)
         try Self.checkTokenValidity(
             statusCode: apiResponse.message.header.statusCode,
             hint: apiResponse.message.header.hint
@@ -132,9 +132,21 @@ extension LyricsProviders.Musixmatch: _LyricsProvider {
         return try parseLyrics(subtitle, with: track)
     }
 
+    private static let invalidTokenError = LyricsProviderError.processingFailed(reason: "Invalid Musixmatch token")
+
+    /// Musixmatch rejects a bad user token either in the response header or with
+    /// HTTP 401; both are the same "invalid token" to the user, not a server failure.
+    private func performJSON<T: Decodable>(_ endpoint: Endpoint) async throws -> T {
+        do {
+            return try await performer.performJSON(endpoint)
+        } catch LyricsProviderError.httpError(statusCode: 401) {
+            throw Self.invalidTokenError
+        }
+    }
+
     private static func checkTokenValidity(statusCode: Int, hint: String?) throws {
         if statusCode != 200, hint == "renew" {
-            throw LyricsProviderError.processingFailed(reason: "Invalid Musixmatch token")
+            throw invalidTokenError
         }
     }
 
