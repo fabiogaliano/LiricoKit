@@ -19,11 +19,13 @@ let krcLineRegex = try! Regex(#"^\[(\d+),(\d+)\](.*)"#, options: .anchorsMatchLi
 
 let qrcLineRegex = Regex(#"^\[(\d+),(\d+)\](.*)"#, options: [.anchorsMatchLines])
 
-let netEaseYrcInlineTagRegex = Regex(#"\((\d+),(\d+),0\)([^(]*)"#)
+// Lyric text can contain the brackets the timing tags use, so each text
+// fragment runs up to the next complete tag, not the next bracket.
+let netEaseYrcInlineTagRegex = Regex(#"\((\d+),(\d+),0\)((?:(?!\(\d+,\d+,0\)).)*)"#)
 
-let netEaseInlineTagRegex = Regex(#"\(0,(\d+)\)([^(]+)(\(0,1\) )?"#)
+let netEaseInlineTagRegex = Regex(#"\(0,(\d+)\)((?:(?!\(0,\d+\)).)+)(\(0,1\) )?"#)
 
-let kugouInlineTagRegex = Regex(#"<(\d+),(\d+),0>([^<]*)"#)
+let kugouInlineTagRegex = Regex(#"<(\d+),(\d+),0>((?:(?!<\d+,\d+,0>).)*)"#)
 
-let qqmusicInlineTagRegex = Regex(#"([^(]*)\((\d+),(\d+)\)"#)
+let qqmusicInlineTagRegex = Regex(#"((?:(?!\(\d+,\d+\)).)*)\((\d+),(\d+)\)"#)
 // swiftlint:enable force_try
